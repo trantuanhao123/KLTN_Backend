@@ -1,0 +1,27 @@
+{
+  "name": "tu-hoc-nodejs",
+  "version": "1.0.0",
+  "description": "Tran Tuan Hao Fullstack Backend",
+  "main": "server.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node server.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/trantuanhao123/TuHocNodeJS.git"
+  },
+  "keywords": [
+    "nodejs",
+    "react"
+  ],
+  "author": "Tran Tuan Hao",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/trantuanhao123/TuHocNodeJS/issues"
+  },
+  "homepage": "https://github.com/trantuanhao123/TuHocNodeJS#readme",
+  "dependencies": {
+    "express": "^5.1.0"
+  }
+}
