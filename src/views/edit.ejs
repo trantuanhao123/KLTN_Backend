@@ -11,20 +11,21 @@
       <a href="/create">Create User</a>
     </div>
     <div class="form-add-new">
-      <form method="post" action="/create-user">
+      <form method="post" action="/edit-user">
         <fieldset>
           <legend>Form edit users</legend>
+          <input type="hidden"name = "id" value="<%= userEdit.id %>" />
           <div class="input-group">
             <label>Email:</label>
-            <input type="text" name="email" />
+            <input type="text" name="email" value="<%= userEdit.email %>"/>
           </div>
           <div class="input-group">
             <label>Name:</label>
-            <input type="text" name="name" />
+            <input type="text" name="name" value="<%= userEdit.name %>"/>
           </div>
           <div class="input-group">
             <label>City:</label>
-            <input type="text" name="city" />
+            <input type="text" name="city" value="<%= userEdit.city %>"/>
           </div>
           <div>
             <button>Save</button>
