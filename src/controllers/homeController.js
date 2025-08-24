@@ -4,6 +4,7 @@ const {
   getUser,
   createUser,
   editUser,
+  deleteUser
 } = require("../services/CRUDService");
 
 const getHomePage = async (req, res) => {
@@ -30,6 +31,11 @@ const getEditForm = async (req, res) => {
   const user = await getUser(userID);
   res.render("edit.ejs", { userEdit: user });
 };
+const getDeleteForm = async(req,res)=>{
+  const userID = req.params.id
+  const user = await getUser(userID)
+  res.render("delete.ejs",{userDelete: user})
+}
 const postCreateUser = async (req, res) => {
   const { email, name, city } = req.body;
   const results = await createUser(email, name, city);
@@ -40,6 +46,11 @@ const postEditUser = async (req, res) => {
   const results = await editUser(email, name, city, id);
   res.send(results);
 };
+const postDeleteUser = async (req,res)=>{
+  const id = req.body.id
+  const results = await deleteUser(id)
+  res.send(results)
+}
 module.exports = {
   getHomePage,
   getHaoTuHoc,
@@ -47,4 +58,6 @@ module.exports = {
   postEditUser,
   getCreateForm,
   getEditForm,
+  getDeleteForm,
+  postDeleteUser
 };
