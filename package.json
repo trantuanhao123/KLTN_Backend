@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "description": "Tran Tuan Hao Fullstack Backend",
   "main": "server.js",
+  "type": "commonjs",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "dev": "nodemon ./src/server.js"
@@ -25,7 +26,9 @@
     "dotenv": "^17.2.1",
     "ejs": "^3.1.10",
     "express": "^5.1.0",
-    "mysql2": "^3.14.3"
+    "mysql2": "^3.14.3",
+    "bcrypt": "^5.1.1",
+    "jsonwebtoken": "^9.0.2"
   },
   "devDependencies": {
     "nodemon": "^3.1.10"

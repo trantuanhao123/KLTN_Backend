@@ -1,73 +1,33 @@
+<!DOCTYPE html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Document</title>
+    <title>Khóa Luận Tốt Nghiệp</title>
     <link rel="stylesheet" href="/css/style.css" />
-    <style>
-      .table-container {
-        padding: 15px 20px;
-      }
-      .title {
-        font: size 25px;
-        font-weight: 600;
-        padding-bottom: 10px;
-      }
-      table {
-        border-collapse: collapse;
-        width: 100%;
-      }
-      th,
-      td {
-        padding: 8px;
-        text-align: left;
-        border-bottom: 1px solid #ddd;
-      }
-      tr:hover {
-        background-color: #ccc;
-      }
-    </style>
   </head>
   <body>
-    <div class="topnav">
-      <a class="active" href="/">Home</a>
-      <a href="/create">Create User</a>
+    <!-- Hero Section -->
+    <div class="hero">
+      <h1>KHÓA LUẬN TỐT NGHIỆP</h1>
+      <p>ĐỀ TÀI 103 - GVHD: LỮ THỊ CẨM TÚ</p>
     </div>
-    <div class="table-container">
-      <div class="title">List Users</div>
-      <table>
-        <tr>
-          <th>ID</th>
-          <th>Email</th>
-          <th>Name</th>
-          <th>City</th>
-          <th>Action</th>
-        </tr>
-        <!-- <% for (let i = 0; i < listUsers.length; i++) { %>
-        <tr>
-          <td><%= listUsers[ i ].id %></td>
-          <td><%= listUsers[ i ].email %></td>
-          <td><%= listUsers[ i ].name %></td>
-          <td><%= listUsers[ i ].city %></td>
-          <td>
-            <button>Edit</button>
-            <button>Delete</button>
-          </td>
-        </tr>
-        <% } %> -->
-        <% listUsers.forEach(function(user) { %>
-        <tr>
-          <td><%= user.id %></td>
-          <td><%= user.email %></td>
-          <td><%= user.name %></td>
-          <td><%= user.city %></td>
-          <td>
-            <a href="/edit/<%= user.id %>">Edit</a>
-            <a href="/delete/<%= user.id %>">Delete</a>
-          </td>
-        </tr>
-        <% }); %>
-      </table>
-    </div>
+
+    <!-- Group Members Section -->
+    <section class="members">
+      <div class="member">
+        <img src="/images/Kiet.png" alt="Thành viên Kiệt" />
+        <h3>Kiệt</h3>
+      </div>
+      <div class="member">
+        <img src="/images/Hao.png" alt="Thành viên Hào" />
+        <h3>Hào</h3>
+      </div>
+    </section>
+
+    <!-- Footer -->
+    <footer>
+      <p>© 2025 Khóa Luận Tốt Nghiệp - Đề Tài 103. All rights reserved.</p>
+    </footer>
   </body>
 </html>
