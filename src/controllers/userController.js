@@ -24,7 +24,25 @@ async function login(req, res) {
     res.status(401).json({ error: error.message });
   }
 }
+async function loginAdmin(req, res) {
+  try {
+    const { email, password } = req.body;
+    const adminInfo = await UserService.loginAdmin({
+      email,
+      password,
+    });
 
+    // Thường thì bạn sẽ tạo và gửi JWT token ở đây thay vì gửi toàn bộ info
+    res.status(200).json({
+      message: "Admin login successful",
+      ...adminInfo,
+    });
+  } catch (error) {
+    // Xử lý các lỗi ném ra từ Service
+    // Ví dụ: "Invalid credentials." hoặc "Access denied."
+    res.status(401).json({ error: error.message });
+  }
+}
 async function profile(req, res) {
   try {
     const user = req.user;
@@ -37,5 +55,6 @@ async function profile(req, res) {
 module.exports = {
   register,
   login,
+  loginAdmin,
   profile,
 };

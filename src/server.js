@@ -6,7 +6,10 @@ const userRouter = require("./routes/userRoutes");
 const app = express(); //app express
 const port = process.env.PORT || 8080; //port
 const hostname = process.env.HOST_NAME;
+const cors = require("cors");
 
+//Thiết lập cors để các client ngoài domain có thể truy cập
+app.use(cors());
 //config req.body
 app.use(express.json()); //for json
 app.use(express.urlencoded({ extended: true })); //for form data
