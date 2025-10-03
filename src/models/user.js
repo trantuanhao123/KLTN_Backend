@@ -31,9 +31,27 @@ async function findById(userId) {
   );
   return rows[0];
 }
-
+async function findForResetPassword(email, phone, fullname) {
+  const sql = `
+    SELECT * 
+    FROM USERS 
+    WHERE EMAIL = ? AND PHONE = ? AND FULLNAME = ?`;
+  const [rows] = await connection.query(sql, [email, phone, fullname]);
+  return rows[0];
+}
+async function resetPassword(userId, newPasswordHash) {
+  const sql = `
+    UPDATE USERS
+    SET PASSWORD_HASH = ?,
+        UPDATED_AT = NOW()
+    WHERE USER_ID = ?`;
+  const [result] = await connection.query(sql, [newPasswordHash, userId]);
+  return result.affectedRows;
+}
 module.exports = {
   create,
   findByEmail,
   findById,
+  findForResetPassword,
+  resetPassword,
 };

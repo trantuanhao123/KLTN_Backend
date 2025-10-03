@@ -21,5 +21,5 @@ app.use("/", webRouter);
 app.use("/user", userRouter);
 
 app.listen(port, hostname, () => {
-  console.log(`Example app listening on port ${port}`);
+  console.log(`App listening on port ${port}`);
 });
