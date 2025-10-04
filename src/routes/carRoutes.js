@@ -4,6 +4,7 @@ const carController = require("../controllers/carController");
 const { uploadCarImages } = require("../config/multer");
 
 const router = express.Router();
+
 // 1. [POST] /api/cars/ (Tạo Car mới - Thường là path root)
 router.post("/", uploadCarImages, carController.handleCreateCar);
 
