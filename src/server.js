@@ -3,6 +3,7 @@ const express = require("express"); //common js
 const configViewEngine = require("./config/viewengine");
 const webRouter = require("./routes/web");
 const userRouter = require("./routes/userRoutes");
+const otpRouter = require("./routes/otpRoutes");
 const app = express(); //app express
 const port = process.env.PORT || 8080; //port
 const hostname = process.env.HOST_NAME;
@@ -19,7 +20,7 @@ configViewEngine(app);
 //khai bao route
 app.use("/", webRouter);
 app.use("/user", userRouter);
-
+app.use("/auth", otpRouter);
 app.listen(port, hostname, () => {
   console.log(`App listening on port ${port}`);
 });

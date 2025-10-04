@@ -67,51 +67,8 @@ async function loginAdmin({ email, password }) {
   };
 }
 
-async function generateResetToken({ email, phone, fullname }) {
-  const user = await UserModel.findForResetPassword(email, phone, fullname);
-  if (!user) throw new Error("Thông tin không khớp với bất kỳ tài khoản nào");
-
-  // Tạo JWT tạm thời, 15 phút
-  const resetToken = jwt.sign(
-    { userId: user.USER_ID },
-    process.env.JWT_SECRET || "khongdoanduocdau",
-    { expiresIn: process.env.JWT_EXPIRES_IN || "1h" }
-  );
-
-  return { resetToken };
-}
-
-async function resetPasswordWithToken(user, newPassword) {
-  if (!user || !newPassword) {
-    throw new Error("Thiếu thông tin người dùng hoặc mật khẩu mới");
-  }
-
-  try {
-    // Hash mật khẩu mới
-    const newPasswordHash = await bcrypt.hash(newPassword, 10);
-
-    // Update mật khẩu
-    const affectedRows = await UserModel.resetPassword(
-      user.USER_ID,
-      newPasswordHash
-    );
-    if (affectedRows === 0) {
-      throw new Error("Cập nhật mật khẩu thất bại");
-    }
-
-    return {
-      message: "Đặt lại mật khẩu thành công",
-    };
-  } catch (err) {
-    console.error("Reset Password Error:", err.message);
-    throw err;
-  }
-}
-
 module.exports = {
   register,
   login,
   loginAdmin,
-  generateResetToken,
-  resetPasswordWithToken,
 };
