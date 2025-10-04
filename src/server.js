@@ -7,6 +7,7 @@ const { checkConnection } = require("./config/database");
 const webRouter = require("./routes/web");
 const userRouter = require("./routes/userRoutes");
 const otpRouter = require("./routes/otpRoutes");
+const carRouter = require("./routes/carRoutes");
 
 const app = express(); //app express
 const port = process.env.PORT || 8080; //port
@@ -25,6 +26,7 @@ configViewEngine(app);
 app.use("/", webRouter);
 app.use("/user", userRouter);
 app.use("/auth", otpRouter);
+app.use("/car", carRouter);
 // Hàm chính khởi động Server
 async function startServer() {
   try {
