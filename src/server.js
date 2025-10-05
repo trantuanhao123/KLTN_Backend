@@ -8,6 +8,8 @@ const webRouter = require("./routes/web");
 const userRouter = require("./routes/userRoutes");
 const otpRouter = require("./routes/otpRoutes");
 const carRouter = require("./routes/carRoutes");
+const serviceRouter = require("./routes/serviceRoutes");
+const branchRouter = require("./routes/branchRoutes");
 
 const app = express(); //app express
 const port = process.env.PORT || 8080; //port
@@ -27,6 +29,8 @@ app.use("/", webRouter);
 app.use("/user", userRouter);
 app.use("/auth", otpRouter);
 app.use("/car", carRouter);
+app.use("/service", serviceRouter);
+app.use("/branch", branchRouter);
 // Hàm chính khởi động Server
 async function startServer() {
   try {

@@ -1,4 +1,4 @@
-const connection = require("../config/database");
+const { connection } = require("../config/database");
 
 async function createToken(userId, otp, expiresAt) {
   const expiresAtStr = expiresAt.toISOString().slice(0, 19).replace("T", " ");
