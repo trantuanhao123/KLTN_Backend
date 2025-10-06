@@ -32,7 +32,7 @@ const createCar = async (carData, imageFileNames, serviceIds) => {
     if (imageFileNames && imageFileNames.length > 0) {
       const imageValues = imageFileNames.map((fileName, index) => {
         const isMain = index === 0 ? 1 : 0;
-        const imageUrl = `/images/${fileName}`; // SỬ DỤNG TÊN FILE DUY NHẤT Ở ĐÂY
+        const imageUrl = `${fileName}`; // SỬ DỤNG TÊN FILE DUY NHẤT Ở ĐÂY
         return [carId, imageUrl, isMain];
       });
 
@@ -168,11 +168,105 @@ const deleteCar = async (carId) => {
   return result.affectedRows;
 };
 
-// ... Thêm hàm updateCar nếu cần
+const updateCar = async (carId, carData, imageFileNames, serviceIds) => {
+  let conn = null;
+  try {
+    conn = await connection.getConnection();
+    await conn.beginTransaction();
+
+    // 1. Cập nhật thông tin cơ bản của Car
+    await conn.execute(
+      `
+        UPDATE CAR 
+        SET 
+          LICENSE_PLATE = ?, 
+          CATEGORY_ID = ?, 
+          BRAND = ?, 
+          MODEL = ?, 
+          COLOR = ?, 
+          TRANSMISSION = ?, 
+          FUEL_TYPE = ?, 
+          STATUS = ?, 
+          PRICE_PER_HOUR = ?, 
+          PRICE_PER_DAY = ?, 
+          BRANCH_ID = ?, 
+          DESCRIPTION = ?, 
+          INSURANCE_INFO = ?, 
+          CURRENT_MILEAGE = ?
+        WHERE CAR_ID = ?
+      `,
+      [
+        carData.licensePlate,
+        carData.categoryId,
+        carData.brand,
+        carData.model,
+        carData.color,
+        carData.transmission,
+        carData.fuelType,
+        carData.status,
+        carData.pricePerHour,
+        carData.pricePerDay,
+        carData.branchId,
+        carData.description,
+        carData.insuranceInfo,
+        carData.currentMileage,
+        carId, // Tham số cuối cùng cho WHERE
+      ]
+    );
+
+    // 2. Xóa tất cả Car Images cũ
+    await conn.execute("DELETE FROM CAR_IMAGE WHERE CAR_ID = ?", [carId]);
+
+    // 3. Thêm Car Images mới (nếu có)
+    if (imageFileNames && imageFileNames.length > 0) {
+      const imageValues = imageFileNames.map((fileName, index) => {
+        const isMain = index === 0 ? 1 : 0;
+        const imageUrl = `${fileName}`;
+        return [carId, imageUrl, isMain];
+      });
+
+      const flatValues = imageValues.flat();
+      const placeholders = imageValues.map(() => "(?, ?, ?)").join(", ");
+
+      await conn.execute(
+        `INSERT INTO CAR_IMAGE (CAR_ID, URL, IS_MAIN) VALUES ${placeholders}`,
+        flatValues
+      );
+    }
+
+    // 4. Xóa tất cả Car Services cũ
+    await conn.execute("DELETE FROM CAR_SERVICE WHERE CAR_ID = ?", [carId]);
+
+    // 5. Thêm Car Services mới (nếu có)
+    if (serviceIds && serviceIds.length > 0) {
+      const serviceValues = serviceIds
+        .map((serviceId) => [carId, serviceId])
+        .flat();
+      const placeholders = serviceIds.map(() => "(?, ?)").join(", ");
+      await conn.execute(
+        `INSERT INTO CAR_SERVICE (CAR_ID, SERVICE_ID) VALUES ${placeholders}`,
+        serviceValues
+      );
+    }
+
+    await conn.commit();
+    return true; // Trả về true nếu cập nhật thành công
+  } catch (error) {
+    if (conn) {
+      await conn.rollback(); // Đảm bảo rollback nếu có lỗi
+    }
+    throw error;
+  } finally {
+    if (conn) {
+      conn.release(); // Đảm bảo release kết nối trở lại Pool
+    }
+  }
+};
 
 module.exports = {
   createCar,
   getCarById,
   getAllCars,
   deleteCar,
+  updateCar,
 };
