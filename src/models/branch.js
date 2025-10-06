@@ -1,4 +1,3 @@
-// models/branch.model.js
 const { connection } = require("../config/database");
 
 // CREATE
