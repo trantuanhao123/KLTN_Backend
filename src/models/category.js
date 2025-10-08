@@ -11,7 +11,18 @@ async function createCategory({ CODE, NAME, DESCRIPTION }) {
 
 // READ ALL
 async function getAllCategories() {
-  const [rows] = await connection.query("SELECT * FROM CATEGORY");
+  const [rows] = await connection.query(`
+    SELECT 
+      c.CATEGORY_ID,
+      c.CODE,
+      c.NAME,
+      c.DESCRIPTION,
+      COUNT(car.CAR_ID) AS total_cars
+    FROM CATEGORY c
+    LEFT JOIN CAR car ON c.CATEGORY_ID = car.CATEGORY_ID
+    GROUP BY c.CATEGORY_ID, c.CODE, c.NAME, c.DESCRIPTION
+    ORDER BY c.CATEGORY_ID ASC
+  `);
   return rows;
 }
 

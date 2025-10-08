@@ -21,7 +21,13 @@ async function createBranch({
 // READ ALL
 async function getAllBranches() {
   const [rows] = await connection.query(
-    `SELECT * FROM BRANCH ORDER BY CREATED_AT DESC`
+    `SELECT 
+        B.*,
+        COALESCE(COUNT(C.CAR_ID), 0) AS car_count
+     FROM BRANCH B
+     LEFT JOIN CAR C ON B.BRANCH_ID = C.BRANCH_ID
+     GROUP BY B.BRANCH_ID
+     ORDER BY B.CREATED_AT DESC`
   );
   return rows;
 }
