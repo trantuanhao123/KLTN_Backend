@@ -156,9 +156,6 @@ const getAllCars = async () => {
   return cars;
 };
 
-/**
- * Xóa một Car và các bản ghi liên quan (nhờ ON DELETE CASCADE)
- */
 const deleteCar = async (carId) => {
   // ON DELETE CASCADE sẽ tự động xóa các bản ghi trong CAR_IMAGE và CAR_SERVICE
   const [result] = await connection.execute(
@@ -168,32 +165,32 @@ const deleteCar = async (carId) => {
   return result.affectedRows;
 };
 
-const updateCar = async (carId, carData, imageFileNames, serviceIds) => {
+const updateCar = async (carId, carData, serviceIds) => {
   let conn = null;
   try {
     conn = await connection.getConnection();
     await conn.beginTransaction();
 
-    // 1. Cập nhật thông tin cơ bản của Car
+    // 1️⃣ Cập nhật thông tin cơ bản
     await conn.execute(
       `
-        UPDATE CAR 
-        SET 
-          LICENSE_PLATE = ?, 
-          CATEGORY_ID = ?, 
-          BRAND = ?, 
-          MODEL = ?, 
-          COLOR = ?, 
-          TRANSMISSION = ?, 
-          FUEL_TYPE = ?, 
-          STATUS = ?, 
-          PRICE_PER_HOUR = ?, 
-          PRICE_PER_DAY = ?, 
-          BRANCH_ID = ?, 
-          DESCRIPTION = ?, 
-          INSURANCE_INFO = ?, 
-          CURRENT_MILEAGE = ?
-        WHERE CAR_ID = ?
+      UPDATE CAR
+      SET 
+        LICENSE_PLATE = ?, 
+        CATEGORY_ID = ?, 
+        BRAND = ?, 
+        MODEL = ?, 
+        COLOR = ?, 
+        TRANSMISSION = ?, 
+        FUEL_TYPE = ?, 
+        STATUS = ?, 
+        PRICE_PER_HOUR = ?, 
+        PRICE_PER_DAY = ?, 
+        BRANCH_ID = ?, 
+        DESCRIPTION = ?, 
+        INSURANCE_INFO = ?, 
+        CURRENT_MILEAGE = ?
+      WHERE CAR_ID = ?
       `,
       [
         carData.licensePlate,
@@ -210,56 +207,30 @@ const updateCar = async (carId, carData, imageFileNames, serviceIds) => {
         carData.description,
         carData.insuranceInfo,
         carData.currentMileage,
-        carId, // Tham số cuối cùng cho WHERE
+        carId,
       ]
     );
 
-    // 2. Xóa tất cả Car Images cũ
-    await conn.execute("DELETE FROM CAR_IMAGE WHERE CAR_ID = ?", [carId]);
+    // 2️⃣ Xóa toàn bộ dịch vụ cũ
+    await conn.execute(`DELETE FROM CAR_SERVICE WHERE CAR_ID = ?`, [carId]);
 
-    // 3. Thêm Car Images mới (nếu có)
-    if (imageFileNames && imageFileNames.length > 0) {
-      const imageValues = imageFileNames.map((fileName, index) => {
-        const isMain = index === 0 ? 1 : 0;
-        const imageUrl = `${fileName}`;
-        return [carId, imageUrl, isMain];
-      });
-
-      const flatValues = imageValues.flat();
-      const placeholders = imageValues.map(() => "(?, ?, ?)").join(", ");
-
+    // 3️⃣ Thêm dịch vụ mới (nếu có)
+    if (serviceIds && serviceIds.length > 0) {
+      const placeholders = serviceIds.map(() => "(?, ?)").join(", ");
+      const flatValues = serviceIds.map((sid) => [carId, sid]).flat();
       await conn.execute(
-        `INSERT INTO CAR_IMAGE (CAR_ID, URL, IS_MAIN) VALUES ${placeholders}`,
+        `INSERT INTO CAR_SERVICE (CAR_ID, SERVICE_ID) VALUES ${placeholders}`,
         flatValues
       );
     }
 
-    // 4. Xóa tất cả Car Services cũ
-    await conn.execute("DELETE FROM CAR_SERVICE WHERE CAR_ID = ?", [carId]);
-
-    // 5. Thêm Car Services mới (nếu có)
-    if (serviceIds && serviceIds.length > 0) {
-      const serviceValues = serviceIds
-        .map((serviceId) => [carId, serviceId])
-        .flat();
-      const placeholders = serviceIds.map(() => "(?, ?)").join(", ");
-      await conn.execute(
-        `INSERT INTO CAR_SERVICE (CAR_ID, SERVICE_ID) VALUES ${placeholders}`,
-        serviceValues
-      );
-    }
-
     await conn.commit();
-    return true; // Trả về true nếu cập nhật thành công
-  } catch (error) {
-    if (conn) {
-      await conn.rollback(); // Đảm bảo rollback nếu có lỗi
-    }
-    throw error;
+    return true;
+  } catch (err) {
+    if (conn) await conn.rollback();
+    throw err;
   } finally {
-    if (conn) {
-      conn.release(); // Đảm bảo release kết nối trở lại Pool
-    }
+    if (conn) conn.release();
   }
 };
 

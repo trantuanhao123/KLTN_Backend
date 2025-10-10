@@ -76,54 +76,26 @@ const handleDeleteCar = async (req, res) => {
 
 const handleUpdateCar = async (req, res) => {
   const carId = req.params.id;
-  const files = req.files || []; // Danh sách file ảnh mới (nếu có)
-  const uploadedFilePaths = []; // Mảng lưu trữ đường dẫn file mới đã upload thành công bởi Multer
-
+  console.log(req.body);
   try {
-    // Lưu lại đường dẫn file mới để xóa nếu có lỗi database
-    if (files.length > 0) {
-      files.forEach((file) => uploadedFilePaths.push(file.path));
-    }
-
     // Kiểm tra cơ bản
     if (!req.body.licensePlate || !req.body.categoryId) {
-      return res
-        .status(400)
-        .json({ error: "Missing required fields for update." });
+      return res.status(400).json({ error: "Missing required fields." });
     }
 
-    // Gọi Service để thực hiện cập nhật
-    const result = await carService.updateExistingCar(carId, req.body, files);
-
+    const result = await carService.updateExistingCar(carId, req.body);
     return res.status(200).json(result);
-  } catch (error) {
-    // ⚠️ Xử lý Rollback File: Xóa các file mới đã upload nếu database bị lỗi
-    if (uploadedFilePaths.length > 0) {
-      for (const filePath of uploadedFilePaths) {
-        // Ta sử dụng fs.unlink không dùng await để việc xóa file không làm chặn luồng lỗi
-        fs.unlink(filePath).catch((err) => {
-          // Ghi lại lỗi khi xóa file tạm đã upload, nhưng vẫn trả về lỗi database ban đầu
-          console.error(`Lỗi khi xóa file tạm đã upload: ${filePath}`, err);
-        });
-      }
-    }
-
-    // Log lỗi khi cập nhật xe
-    console.error(`Lỗi khi cập nhật xe ID ${carId}:`, error);
-
-    // Xác định Status Code phù hợp (404 nếu không tìm thấy, 500 nếu lỗi server/DB khác)
+  } catch (err) {
+    console.error(`❌ Lỗi khi cập nhật xe ID ${carId}:`, err);
     const status =
-      error.message.includes("not found") ||
-      error.message.includes("Invalid Car ID")
+      err.message.includes("not found") ||
+      err.message.includes("Invalid Car ID")
         ? 404
         : 500;
 
-    return res.status(status).json({
-      error: error.message || "Internal Server Error",
-    });
+    return res.status(status).json({ error: err.message });
   }
 };
-
 module.exports = {
   handleCreateCar,
   handleGetCarDetails,

@@ -10,7 +10,7 @@ router.post("/", uploadCarImages, carController.handleCreateCar);
 // router.get("/", authMiddleware, carController.handleGetAllCars);
 router.get("/", carController.handleGetAllCars);
 router.get("/:id", carController.handleGetCarDetails);
-router.put("/:id", uploadCarImages, carController.handleUpdateCar);
+router.put("/:id", carController.handleUpdateCar);
 router.delete("/:id", carController.handleDeleteCar);
 
 module.exports = router;
