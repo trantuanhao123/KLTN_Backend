@@ -145,21 +145,25 @@ const getCarById = async (carId) => {
  * Lấy danh sách Car
  */
 const getAllCars = async () => {
-  // Lấy thông tin Car cơ bản và Main Image (sử dụng Subquery hoặc LEFT JOIN)
   const [cars] = await connection.execute(
     `SELECT 
-            C.*, 
-            (SELECT URL FROM CAR_IMAGE CI WHERE CI.CAR_ID = C.CAR_ID AND CI.IS_MAIN = 1 LIMIT 1) AS mainImageUrl
-         FROM CAR C
-         ORDER BY C.CREATED_AT DESC`
+        C.*, 
+        (SELECT URL 
+         FROM CAR_IMAGE CI 
+         WHERE CI.CAR_ID = C.CAR_ID 
+           AND CI.IS_MAIN = 1 
+         LIMIT 1) AS mainImageUrl
+     FROM CAR C
+     ORDER BY 
+        FIELD(C.STATUS, 'AVAILABLE', 'RESERVED', 'RENTED', 'MAINTENANCE', 'DELETED'),
+        C.CREATED_AT DESC`
   );
   return cars;
 };
 
 const deleteCar = async (carId) => {
-  // ON DELETE CASCADE sẽ tự động xóa các bản ghi trong CAR_IMAGE và CAR_SERVICE
   const [result] = await connection.execute(
-    "DELETE FROM CAR WHERE CAR_ID = ?",
+    "UPDATE CAR SET STATUS = 'DELETED' WHERE CAR_ID = ?",
     [carId]
   );
   return result.affectedRows;

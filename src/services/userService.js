@@ -66,9 +66,53 @@ async function loginAdmin({ email, password }) {
     token,
   };
 }
+// 🆕 Lấy danh sách người dùng
+async function getAllUsers() {
+  const users = await UserModel.getAll();
+  return users;
+}
+
+// 🆕 Lấy thông tin người dùng theo ID
+async function getUserById(userId) {
+  const user = await UserModel.findById(userId);
+  if (!user || user.IS_DELETED) throw new Error("Người dùng không tồn tại");
+  return user;
+}
+
+// 🆕 Cập nhật thông tin người dùng
+async function updateUser(userId, updateData) {
+  const affected = await UserModel.update(userId, updateData);
+  if (!affected) throw new Error("Không thể cập nhật người dùng");
+  return await UserModel.findById(userId);
+}
+
+// 🆕 Xóa người dùng (soft delete)
+async function deleteUser(userId) {
+  const affected = await UserModel.deleteById(userId);
+  if (!affected) throw new Error("Không thể xóa người dùng");
+  return true;
+}
+
+async function reActiveUser(userId) {
+  const affected = await UserModel.reActiveById(userId);
+  if (!affected) throw new Error("Không thể xóa người dùng");
+  return true;
+}
+// 🆕 Xác minh tài khoản (VERIFIED = 1)
+async function verifyUser(userId) {
+  const affected = await UserModel.verifyUser(userId);
+  if (!affected) throw new Error("Không thể xác minh người dùng");
+  return await UserModel.findById(userId);
+}
 
 module.exports = {
   register,
   login,
   loginAdmin,
+  getAllUsers,
+  getUserById,
+  updateUser,
+  deleteUser,
+  verifyUser,
+  reActiveUser,
 };

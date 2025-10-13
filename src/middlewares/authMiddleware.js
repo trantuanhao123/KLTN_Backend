@@ -13,7 +13,12 @@ async function authMiddleware(req, res, next) {
     );
     const user = await UserModel.findById(decoded.userId);
     if (!user) return res.sendStatus(403);
-    req.user = user;
+    req.user = {
+      USER_ID: user.USER_ID,
+      EMAIL: user.EMAIL,
+      FULLNAME: user.FULLNAME,
+      ROLE: user.ROLE,
+    };
     next();
   } catch (error) {
     res.status(403).json({ error: "Invalid token" });
