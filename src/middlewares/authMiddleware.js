@@ -16,8 +16,19 @@ async function authMiddleware(req, res, next) {
     req.user = {
       USER_ID: user.USER_ID,
       EMAIL: user.EMAIL,
-      FULLNAME: user.FULLNAME,
+      PHONE: user.PHONE,
       ROLE: user.ROLE,
+      VERIFIED: user.VERIFIED,
+      PROVIDER: user.PROVIDER,
+      FULLNAME: user.FULLNAME,
+      BIRTHDATE: user.BIRTHDATE,
+      AVATAR_URL: user.AVATAR_URL,
+      ADDRESS: user.ADDRESS,
+      ID_CARD: user.ID_CARD,
+      LICENSE_FRONT_URL: user.LICENSE_FRONT_URL,
+      LICENSE_BACK_URL: user.LICENSE_BACK_URL,
+      RATING: user.RATING,
+      CREATED_AT: user.CREATED_AT,
     };
     next();
   } catch (error) {

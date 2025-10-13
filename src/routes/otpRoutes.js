@@ -11,11 +11,5 @@ router.post(
   authController.requestReset
 );
 
-// POST /api/auth/verify-otp
-// Nhận email, OTP, mật khẩu mới, xác thực và đổi mật khẩu
-router.post(
-  "/verify-otp",
-  validateVerifyOtp, // ⬅️ Middleware kiểm tra Joi
-  authController.verifyOtp
-);
+router.post("/verify-otp", validateVerifyOtp, authController.verifyOtp);
 module.exports = router;

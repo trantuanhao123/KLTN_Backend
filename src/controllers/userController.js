@@ -1,5 +1,27 @@
 const UserService = require("../services/userService");
+const fs = require("fs");
+const path = require("path");
 
+const IMAGE_DIR = path.join(__dirname, "..", "public", "images");
+
+function deleteIfExists(filenameOrUrl) {
+  if (!filenameOrUrl) return;
+  let filename = filenameOrUrl;
+  if (filenameOrUrl.includes("/images/")) {
+    filename = filenameOrUrl.split("/images/")[1];
+  }
+
+  const filePath = path.join(IMAGE_DIR, filename);
+  fs.access(filePath, fs.constants.F_OK, (err) => {
+    if (err) {
+      return;
+    }
+
+    fs.unlink(filePath, (err) => {
+      if (err) console.error("❌ Lỗi khi xóa file:", err.message);
+    });
+  });
+}
 async function register(req, res) {
   try {
     const { email, phone, password, fullname } = req.body;
@@ -65,11 +87,78 @@ async function getUserById(req, res) {
   }
 }
 
-async function updateUser(req, res) {
+async function updateProfile(req, res) {
   try {
     const { id } = req.params;
-    const updated = await UserService.updateUser(id, req.body);
-    res.json({ message: "Cập nhật thành công", user: updated });
+    const profileData = req.body;
+
+    const updatedUser = await UserService.updateUserProfile(id, profileData);
+
+    res.json({ message: "Cập nhật thông tin thành công!", user: updatedUser });
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+}
+
+async function uploadAvatar(req, res) {
+  try {
+    const { id } = req.params;
+
+    if (!req.file) {
+      throw new Error("Vui lòng tải lên một ảnh đại diện.");
+    }
+
+    const newAvatar = req.file.filename;
+
+    // 🔍 Lấy thông tin user hiện tại
+    const user = await UserService.getUserById(id);
+    if (!user) throw new Error("Không tìm thấy người dùng.");
+
+    // 🧹 Nếu user có avatar cũ thì xóa
+    if (user.AVATAR_URL) {
+      console.log("🧾 Avatar cũ:", user.AVATAR_URL);
+      deleteIfExists(user.AVATAR_URL);
+    }
+
+    // 💾 Cập nhật DB với avatar mới
+    const updatedUser = await UserService.updateUserAvatar(id, newAvatar);
+
+    res.json({
+      message: "Cập nhật ảnh đại diện thành công!",
+      user: updatedUser,
+    });
+  } catch (error) {
+    console.error("❌ Lỗi uploadAvatar:", error);
+    res.status(400).json({ error: error.message });
+  }
+}
+
+async function uploadLicense(req, res) {
+  try {
+    const { id } = req.params;
+
+    if (!req.files || !req.files.license_front || !req.files.license_back) {
+      throw new Error(
+        "Vui lòng tải lên đủ ảnh mặt trước và mặt sau của bằng lái."
+      );
+    }
+
+    const newLicense = {
+      frontUrl: req.files.license_front[0].filename,
+      backUrl: req.files.license_back[0].filename,
+    };
+
+    // Lấy thông tin cũ để xóa ảnh cũ
+    const user = await UserService.getUserById(id);
+    if (user?.LICENSE_FRONT_URL) deleteIfExists(user.LICENSE_FRONT_URL);
+    if (user?.LICENSE_BACK_URL) deleteIfExists(user.LICENSE_BACK_URL);
+
+    const updatedUser = await UserService.updateUserLicense(id, newLicense);
+
+    res.json({
+      message: "Cập nhật bằng lái xe thành công!",
+      user: updatedUser,
+    });
   } catch (error) {
     res.status(400).json({ error: error.message });
   }
@@ -110,7 +199,9 @@ module.exports = {
   profile,
   getAllUsers,
   getUserById,
-  updateUser,
+  updateProfile,
+  uploadAvatar,
+  uploadLicense,
   deleteUser,
   verifyUser,
   reActiveUser,

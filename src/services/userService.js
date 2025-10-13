@@ -20,7 +20,7 @@ async function register({ email, phone, password, fullname }) {
 async function login({ email, password }) {
   const user = await UserModel.findByEmail(email);
   if (!user) throw new Error("Sai tài khoản hoặc mật khẩu");
-
+  if (user.IS_DELETED) throw new Error("Tài khoản này đã bị khóa");
   const valid = await bcrypt.compare(password, user.PASSWORD_HASH);
   if (!valid) throw new Error("Sai tài khoản hoặc mật khẩu");
 
@@ -80,9 +80,38 @@ async function getUserById(userId) {
 }
 
 // 🆕 Cập nhật thông tin người dùng
-async function updateUser(userId, updateData) {
-  const affected = await UserModel.update(userId, updateData);
-  if (!affected) throw new Error("Không thể cập nhật người dùng");
+async function updateUserProfile(userId, profileData) {
+  const affectedRows = await UserModel.updateProfileInfo(userId, profileData);
+
+  if (affectedRows === 0) {
+    throw new Error("Cập nhật thông tin thất bại hoặc không có gì thay đổi.");
+  }
+
+  // Trả về thông tin người dùng đã được làm mới
+  return await UserModel.findById(userId);
+}
+
+// 2. Cập nhật ảnh đại diện (Avatar)
+async function updateUserAvatar(userId, avatarUrl) {
+  const affectedRows = await UserModel.updateAvatar(userId, avatarUrl);
+
+  if (affectedRows === 0) {
+    throw new Error("Cập nhật ảnh đại diện thất bại.");
+  }
+
+  // Trả về thông tin người dùng đã được làm mới
+  return await UserModel.findById(userId);
+}
+
+// 3. Cập nhật bằng lái xe (License)
+async function updateUserLicense(userId, licenseUrls) {
+  const affectedRows = await UserModel.updateLicense(userId, licenseUrls);
+
+  if (affectedRows === 0) {
+    throw new Error("Cập nhật thông tin bằng lái xe thất bại.");
+  }
+
+  // Trả về thông tin người dùng đã được làm mới
   return await UserModel.findById(userId);
 }
 
@@ -111,7 +140,9 @@ module.exports = {
   loginAdmin,
   getAllUsers,
   getUserById,
-  updateUser,
+  updateUserAvatar,
+  updateUserLicense,
+  updateUserProfile,
   deleteUser,
   verifyUser,
   reActiveUser,

@@ -8,8 +8,8 @@ const generateRandomString = (length = 4) => {
     .substring(2, 2 + length);
 };
 
-// Cấu hình lưu trữ
-const carImageStorage = multer.diskStorage({
+// Cấu hình lưu trữ chung
+const commonStorage = multer.diskStorage({
   destination: (req, file, cb) => {
     cb(null, path.join(__dirname, "..", "public", "images"));
   },
@@ -20,17 +20,43 @@ const carImageStorage = multer.diskStorage({
   },
 });
 
-// Kiểm tra loại file
+// Chỉ cho phép file ảnh
 const fileFilter = (req, file, cb) => {
   if (file.mimetype.startsWith("image/")) cb(null, true);
   else cb(new Error("File không phải là hình ảnh!"), false);
 };
 
-// Middleware Multer cho nhiều hình ảnh
-const uploadCarImages = multer({
-  storage: carImageStorage,
-  fileFilter,
-  limits: { fileSize: 1024 * 1024 * 5 }, // Giới hạn 5MB
-}).array("carImages", 10);
+// Hàm tạo upload middleware linh hoạt
+function createUploadMiddleware(fieldName, maxCount = 1) {
+  return multer({
+    storage: commonStorage,
+    fileFilter,
+    limits: { fileSize: 1024 * 1024 * 5 }, // Giới hạn 5MB
+  }).array(fieldName, maxCount);
+}
 
-module.exports = { uploadCarImages };
+// ✅ Upload avatar (1 hình)
+const uploadAvatar = multer({
+  storage: commonStorage,
+  fileFilter,
+  limits: { fileSize: 1024 * 1024 * 5 },
+}).single("avatar");
+
+// ✅ Upload hình xe (nhiều hình)
+const uploadCarImages = createUploadMiddleware("carImages", 10);
+
+// ✅ Upload bằng lái (2 hình trong cùng form)
+const uploadLicense = multer({
+  storage: commonStorage,
+  fileFilter,
+  limits: { fileSize: 1024 * 1024 * 5 },
+}).fields([
+  { name: "license_front", maxCount: 1 },
+  { name: "license_back", maxCount: 1 },
+]);
+
+module.exports = {
+  uploadAvatar,
+  uploadCarImages,
+  uploadLicense,
+};

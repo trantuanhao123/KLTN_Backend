@@ -37,23 +37,12 @@ async function findById(userId) {
   return rows[0];
 }
 
-// 🔍 Dùng cho reset password
-async function findForResetPassword(email, phone, fullname) {
-  const sql = `
-    SELECT * 
-    FROM USERS 
-    WHERE EMAIL = ? AND PHONE = ? AND FULLNAME = ? AND IS_DELETED = 0
-  `;
-  const [rows] = await connection.query(sql, [email, phone, fullname]);
-  return rows[0];
-}
-
 // 🔁 Cập nhật mật khẩu
 async function resetPassword(userId, newPasswordHash) {
   const sql = `
     UPDATE USERS
     SET PASSWORD_HASH = ?, UPDATED_AT = NOW()
-    // WHERE USER_ID = ? AND IS_DELETED = 0
+    WHERE USER_ID = ? AND IS_DELETED = 0
   `;
   const [result] = await connection.query(sql, [newPasswordHash, userId]);
   return result.affectedRows;
@@ -73,25 +62,67 @@ async function getAll() {
 }
 
 // 🧩 Cập nhật thông tin người dùng
-async function update(userId, updateData) {
+async function updateProfileInfo(userId, profileData) {
+  // Chỉ cho phép cập nhật những trường này
+  const allowedFields = [
+    "FULLNAME",
+    "BIRTHDATE",
+    "ADDRESS",
+    "PHONE",
+    "ID_CARD",
+  ];
+
   const fields = [];
   const values = [];
 
-  for (const [key, value] of Object.entries(updateData)) {
-    fields.push(`${key.toUpperCase()} = ?`);
-    values.push(value);
+  for (const key of allowedFields) {
+    // Nếu client có gửi lên dữ liệu cho trường được phép
+    if (profileData[key.toLowerCase()] !== undefined) {
+      fields.push(`${key} = ?`);
+      values.push(profileData[key.toLowerCase()]);
+    }
   }
 
-  if (fields.length === 0) return 0;
+  // Nếu không có trường nào hợp lệ để cập nhật
+  if (fields.length === 0) {
+    return 0;
+  }
 
-  const sql = `
-    UPDATE USERS 
-    SET ${fields.join(", ")}, UPDATED_AT = NOW()
-    WHERE USER_ID = ? AND IS_DELETED = 0
-  `;
   values.push(userId);
 
+  const sql = `
+    UPDATE USERS
+    SET ${fields.join(", ")}
+    WHERE USER_ID = ?
+  `;
+
   const [result] = await connection.query(sql, values);
+  return result.affectedRows;
+}
+
+// 🖼️ Cập nhật URL ảnh đại diện (avatar)
+async function updateAvatar(userId, avatarUrl) {
+  const sql = `
+    UPDATE USERS 
+    SET AVATAR_URL = ?
+    WHERE USER_ID = ?
+  `;
+  const [result] = await connection.query(sql, [avatarUrl, userId]);
+  return result.affectedRows;
+}
+
+// 💳 Cập nhật URL bằng lái xe
+async function updateLicense(userId, licenseUrls) {
+  const sql = `
+    UPDATE USERS 
+    SET LICENSE_FRONT_URL = ?, LICENSE_BACK_URL = ?
+    WHERE USER_ID = ?
+  `;
+  const [result] = await connection.query(sql, [
+    licenseUrls.frontUrl,
+    licenseUrls.backUrl,
+    userId,
+  ]);
   return result.affectedRows;
 }
 
@@ -129,10 +160,11 @@ module.exports = {
   create,
   findByEmail,
   findById,
-  findForResetPassword,
   resetPassword,
   getAll,
-  update,
+  updateAvatar,
+  updateLicense,
+  updateProfileInfo,
   deleteById,
   verifyUser,
   reActiveById,

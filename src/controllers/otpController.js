@@ -31,10 +31,6 @@ async function requestReset(req, res) {
   }
 }
 
-/**
- * Endpoint: POST /api/auth/verify-otp
- * Logic: Nhận email, OTP, mật khẩu mới, gọi Service xác thực và đổi mật khẩu.
- */
 async function verifyOtp(req, res) {
   const { email, otp, newPassword } = req.body;
 
