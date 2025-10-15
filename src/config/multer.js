@@ -55,8 +55,15 @@ const uploadLicense = multer({
   { name: "license_back", maxCount: 1 },
 ]);
 
+const uploadBannerImage = multer({
+  storage: commonStorage,
+  fileFilter,
+  limits: { fileSize: 1024 * 1024 * 5 }, // Giới hạn 5MB
+}).single("banner_url");
+
 module.exports = {
   uploadAvatar,
   uploadCarImages,
   uploadLicense,
+  uploadBannerImage,
 };

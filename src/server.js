@@ -12,6 +12,7 @@ const serviceRouter = require("./routes/serviceRoutes");
 const branchRouter = require("./routes/branchRoutes");
 const categoryRouter = require("./routes/categoryRoutes");
 const carImageRouter = require("./routes/carImageRoutes");
+const bannerRouter = require("./routes/bannerRoutes");
 
 const app = express(); //app express
 const port = process.env.PORT || 8080; //port
@@ -35,6 +36,7 @@ app.use("/service", serviceRouter);
 app.use("/branch", branchRouter);
 app.use("/category", categoryRouter);
 app.use("/car-image", carImageRouter);
+app.use("/banner", bannerRouter);
 // Hàm chính khởi động Server
 async function startServer() {
   try {
