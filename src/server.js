@@ -1,5 +1,5 @@
 require("dotenv").config();
-const express = require("express"); //common js
+const express = require("express");
 const configViewEngine = require("./config/viewengine");
 
 const { checkConnection } = require("./config/database");
@@ -14,6 +14,7 @@ const categoryRouter = require("./routes/categoryRoutes");
 const carImageRouter = require("./routes/carImageRoutes");
 const bannerRouter = require("./routes/bannerRoutes");
 const payosRouter = require("./routes/payosRoutes");
+const rentalOrderRouter = require("./routes/rentalOrderRoutes");
 
 const app = express(); //app express
 const port = process.env.PORT || 8080; //port
@@ -39,6 +40,8 @@ app.use("/category", categoryRouter);
 app.use("/car-image", carImageRouter);
 app.use("/banner", bannerRouter);
 app.use("/payos", payosRouter);
+app.use("/order", rentalOrderRouter);
+
 // Hàm chính khởi động Server
 async function startServer() {
   try {
