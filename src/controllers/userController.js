@@ -31,9 +31,34 @@ async function register(req, res) {
       password,
       fullname,
     });
-    res.status(201).json({ message: "User registered successfully", result });
+    res.status(201).json(result);
   } catch (error) {
     res.status(400).json({ error: error.message });
+  }
+}
+async function verifyRegistration(req, res) {
+  try {
+    // 👈 Chỉ cần email và otp
+    const { email, otp } = req.body;
+    if (!email || !otp) {
+      return res.status(400).json({ error: "Vui lòng cung cấp email và OTP." });
+    }
+
+    const result = await UserService.verifyRegistration({ email, otp });
+
+    // 👈 Trả về token và user
+    res.json({ message: "Xác thực tài khoản thành công!", ...result });
+  } catch (error) {
+    // Xử lý lỗi nghiệp vụ
+    if (error.message.includes("Email không tồn tại")) {
+      return res.status(404).json({ message: error.message });
+    }
+    if (error.message.includes("OTP không hợp lệ")) {
+      return res.status(400).json({ message: error.message });
+    }
+
+    console.error("Lỗi Controller khi xác thực đăng ký:", error);
+    res.status(500).json({ message: "Đã xảy ra lỗi hệ thống." });
   }
 }
 async function login(req, res) {
@@ -194,6 +219,7 @@ async function verifyUser(req, res) {
 
 module.exports = {
   register,
+  verifyRegistration,
   login,
   loginAdmin,
   profile,

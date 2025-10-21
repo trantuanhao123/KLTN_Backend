@@ -10,6 +10,7 @@ const {
 } = require("../config/multer");
 
 router.post("/register", userController.register);
+router.post("/verify-register", userController.verifyRegistration);
 router.post("/login", userController.login);
 router.post("/loginAdmin", userController.loginAdmin);
 router.get("/profile", authMiddleware, userController.profile);

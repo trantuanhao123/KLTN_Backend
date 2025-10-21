@@ -1,26 +1,99 @@
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const UserModel = require("../models/user");
+const OtpModel = require("../models/verifiedEmail");
+const transporter = require("../config/nodemailer");
 
 async function register({ email, phone, password, fullname }) {
   const existingUser = await UserModel.findByEmail(email);
-  if (existingUser) throw new Error("Email đã được đăng ký");
+
+  if (existingUser && existingUser.IS_EMAIL_VERIFIED) {
+    throw new Error("Email đã được đăng ký");
+  }
+  if (existingUser && existingUser.IS_DELETED) {
+    throw new Error("Email này đã bị khóa và không thể đăng ký lại.");
+  }
 
   const passwordHash = await bcrypt.hash(password, 10);
-  const userId = await UserModel.create({
-    email,
-    phone,
-    passwordHash,
-    fullname,
+  let userId;
+
+  if (existingUser && !existingUser.IS_EMAIL_VERIFIED) {
+    // 2. User tồn tại NHƯNG CHƯA XÁC THỰC EMAIL
+    userId = existingUser.USER_ID;
+    await UserModel.updateUnverifiedUser(userId, {
+      phone,
+      passwordHash,
+      fullname,
+    });
+    await OtpModel.clearAllForUser(userId); // Xóa OTP cũ
+  } else {
+    // 3. User hoàn toàn mới
+    userId = await UserModel.create({
+      email,
+      phone,
+      passwordHash,
+      fullname,
+    });
+  }
+
+  // 4. Tạo và gửi OTP (Giống hệt otpService.js)
+  const otp = Math.floor(100000 + Math.random() * 900000).toString();
+  const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 phút
+
+  await OtpModel.createToken(userId, otp, expiresAt); // 👈 Dùng OtpModel
+
+  await transporter.sendMail({
+    from: process.env.MAIL_USER,
+    to: email,
+    subject: "Mã xác nhận đăng ký tài khoản",
+    text: `Mã OTP của bạn là: ${otp}. Mã này sẽ hết hạn trong 10 phút.`,
   });
 
-  return { userId, email };
+  return {
+    message: "Đăng ký thành công. Vui lòng kiểm tra email để lấy mã OTP.",
+    userId: userId,
+  };
+}
+async function verifyRegistration({ email, otp }) {
+  const user = await UserModel.findByEmail(email);
+
+  if (!user) throw new Error("Email không tồn tại");
+  if (user.IS_EMAIL_VERIFIED)
+    throw new Error("Tài khoản đã được xác minh trước đó");
+
+  // 1. Tìm OTP hợp lệ (Dùng OtpModel)
+  const tokenEntry = await OtpModel.findValidToken(user.USER_ID, otp);
+
+  if (!tokenEntry) {
+    throw new Error("OTP không hợp lệ hoặc đã hết hạn");
+  }
+
+  // 2. Cập nhật User (IS_EMAIL_VERIFIED = 1)
+  await UserModel.setEmailAsVerified(user.USER_ID);
+
+  // 3. Đánh dấu OTP đã dùng (Dùng OtpModel)
+  await OtpModel.markTokenAsUsed(tokenEntry.id);
+
+  // 4. Lấy thông tin user mới nhất
+  const verifiedUser = await UserModel.findById(user.USER_ID);
+
+  // 5. Tạo token
+  const token = jwt.sign(
+    { userId: verifiedUser.USER_ID, role: verifiedUser.ROLE },
+    process.env.JWT_SECRET || "khongdoanduocdau",
+    { expiresIn: process.env.JWT_EXPIRES_IN || "1h" }
+  );
+
+  return { token, user: verifiedUser };
 }
 
 async function login({ email, password }) {
   const user = await UserModel.findByEmail(email);
   if (!user) throw new Error("Sai tài khoản hoặc mật khẩu");
   if (user.IS_DELETED) throw new Error("Tài khoản này đã bị khóa");
+  if (!user.IS_EMAIL_VERIFIED) {
+    throw new Error("Tài khoản chưa được kích hoạt. Vui lòng kiểm tra email.");
+  }
   const valid = await bcrypt.compare(password, user.PASSWORD_HASH);
   if (!valid) throw new Error("Sai tài khoản hoặc mật khẩu");
 
@@ -136,6 +209,7 @@ async function verifyUser(userId) {
 
 module.exports = {
   register,
+  verifyRegistration,
   login,
   loginAdmin,
   getAllUsers,

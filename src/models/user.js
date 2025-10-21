@@ -21,10 +21,9 @@ async function create(userData) {
 
 // 🔍 Tìm theo email
 async function findByEmail(email) {
-  const [rows] = await connection.query(
-    `SELECT * FROM USERS WHERE EMAIL = ? AND IS_DELETED = 0`,
-    [email]
-  );
+  const [rows] = await connection.query(`SELECT * FROM USERS WHERE EMAIL = ?`, [
+    email,
+  ]);
   return rows[0];
 }
 
@@ -145,6 +144,32 @@ async function reActiveById(userId) {
   const [result] = await connection.query(sql, [userId]);
   return result.affectedRows;
 }
+
+async function updateUnverifiedUser(userId, { phone, passwordHash, fullname }) {
+  const sql = `
+    UPDATE USERS
+    SET PHONE = ?, PASSWORD_HASH = ?, FULLNAME = ?, UPDATED_AT = NOW()
+    WHERE USER_ID = ? AND IS_EMAIL_VERIFIED = 0
+  `;
+  const [result] = await connection.query(sql, [
+    phone,
+    passwordHash,
+    fullname,
+    userId,
+  ]);
+  return result.affectedRows;
+}
+
+// 🆕 SET EMAIL ĐÃ XÁC THỰC 👈 (Hàm mới)
+async function setEmailAsVerified(userId) {
+  const sql = `
+    UPDATE USERS 
+    SET IS_EMAIL_VERIFIED = 1, UPDATED_AT = NOW()
+    WHERE USER_ID = ?
+  `;
+  const [result] = await connection.query(sql, [userId]);
+  return result.affectedRows;
+}
 // ✅ Đánh dấu người dùng đã xác minh
 async function verifyUser(userId) {
   const sql = `
@@ -168,4 +193,6 @@ module.exports = {
   deleteById,
   verifyUser,
   reActiveById,
+  updateUnverifiedUser,
+  setEmailAsVerified,
 };

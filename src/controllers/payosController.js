@@ -1,4 +1,3 @@
-// controllers/payosController.js
 const PayOSService = require("../services/payosService");
 
 async function createPayment(req, res) {
@@ -6,7 +5,7 @@ async function createPayment(req, res) {
     const paymentLink = await PayOSService.createPayment(req.body);
     res.json({ url: paymentLink });
   } catch (error) {
-    console.error(error);
+    console.error("❌ Lỗi tạo link:", error);
     res.status(500).json({ error: "Tạo link thanh toán thất bại" });
   }
 }
@@ -16,7 +15,7 @@ async function webhook(req, res) {
     const result = await PayOSService.handleWebhook(req.body);
     res.json(result);
   } catch (error) {
-    console.error(error);
+    console.error("❌ Lỗi webhook:", error);
     res.status(400).json({ error: "Xử lý webhook thất bại" });
   }
 }

@@ -15,6 +15,7 @@ const carImageRouter = require("./routes/carImageRoutes");
 const bannerRouter = require("./routes/bannerRoutes");
 const payosRouter = require("./routes/payosRoutes");
 const rentalOrderRouter = require("./routes/rentalOrderRoutes");
+const paymentRouter = require("./routes/paymentRoutes");
 
 const app = express(); //app express
 const port = process.env.PORT || 8080; //port
@@ -41,6 +42,7 @@ app.use("/car-image", carImageRouter);
 app.use("/banner", bannerRouter);
 app.use("/payos", payosRouter);
 app.use("/order", rentalOrderRouter);
+app.use("/payment", paymentRouter);
 
 // Hàm chính khởi động Server
 async function startServer() {

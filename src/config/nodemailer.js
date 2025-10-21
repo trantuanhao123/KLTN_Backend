@@ -8,21 +8,4 @@ const transporter = nodemailer.createTransport({
   },
 });
 
-// Cấu hình email
-// const mailOptions = {
-//   from:process.env.MAILER_USER,
-//   to: "recipient-email@example.com",
-//   subject: "Test Email",
-//   text: "This is a test email sent using Nodemailer!",
-// };
-
-// // Gửi email
-// transporter.sendMail(mailOptions, (error, info) => {
-//   if (error) {
-//     console.log("Error:", error);
-//   } else {
-//     console.log("Email sent:", info.response);
-//   }
-// });
-
 module.exports = transporter;
