@@ -24,6 +24,7 @@
   "homepage": "https://github.com/trantuanhao123/TuHocNodeJS#readme",
   "dependencies": {
     "@payos/node": "^2.0.3",
+    "axios": "^1.12.2",
     "bcrypt": "^5.1.1",
     "cors": "^2.8.5",
     "crypto": "^1.0.1",
@@ -35,7 +36,9 @@
     "jsonwebtoken": "^9.0.2",
     "multer": "^2.0.2",
     "mysql2": "^3.14.3",
-    "nodemailer": "^7.0.6"
+    "node-cron": "^4.2.1",
+    "nodemailer": "^7.0.6",
+    "uuidv4": "^6.2.13"
   },
   "devDependencies": {
     "nodemon": "^3.1.10"

@@ -1,86 +1,146 @@
-const {
-  createOrder,
-  getOrder,
-  getOrdersByUser,
-  getAllOrders,
-  changeOrderStatus,
-  setExtraFeeForOrder,
-  removeOrder,
-} = require("../services/rentalOrderService");
+const rentalOrderService = require("../services/rentalOrderService");
 
-// USER
-async function handleCreateOrder(req, res) {
+// POST /api/orders (Bước 2)
+const handleCreateOrder = async (req, res) => {
   try {
-    const result = await createOrder(req.body);
-    res.status(201).json({ message: "Tạo đơn thuê thành công", data: result });
-  } catch (err) {
-    res.status(400).json({ error: err.message });
-  }
-}
+    // Giả sử userId được lấy từ authMiddleware
+    const userId = req.user.USER_ID;
+    const { carId, startDate, endDate, rentalType, paymentOption } = req.body;
 
-async function handleGetOrder(req, res) {
-  try {
-    const order = await getOrder(req.params.order_id);
-    res.json(order);
-  } catch (err) {
-    res.status(404).json({ error: err.message });
-  }
-}
+    if (!carId || !startDate || !endDate) {
+      return res.status(400).json({ error: "Thiếu thông tin bắt buộc." });
+    }
 
-async function handleGetUserOrders(req, res) {
-  try {
-    const orders = await getOrdersByUser(req.params.user_id);
-    res.json(orders);
-  } catch (err) {
-    res.status(400).json({ error: err.message });
-  }
-}
+    const paymentLink = await rentalOrderService.createOrder(
+      userId,
+      carId,
+      startDate,
+      endDate,
+      rentalType,
+      paymentOption
+    );
 
-// ADMIN
-async function handleGetAllOrders(req, res) {
-  try {
-    const orders = await getAllOrders();
-    res.json(orders);
-  } catch (err) {
-    res.status(400).json({ error: err.message });
+    return res.status(201).json(paymentLink);
+  } catch (error) {
+    return res.status(500).json({ error: error.message });
   }
-}
+};
 
-async function handleUpdateStatus(req, res) {
+// PATCH /api/orders/:id/cancel-pending (Bước 3, TH3)
+const handleCancelPendingOrder = async (req, res) => {
   try {
-    await changeOrderStatus(req.params.order_id, req.body.status);
-    res.json({ message: "Cập nhật trạng thái thành công" });
-  } catch (err) {
-    res.status(400).json({ error: err.message });
-  }
-}
+    const userId = req.user.USER_ID;
+    const orderId = parseInt(req.params.id);
 
-// ✅ Ghi đè phí phát sinh + cập nhật trạng thái + paid=false
-async function handleSetExtraFee(req, res) {
-  try {
-    const { amount, reason } = req.body;
-    await setExtraFeeForOrder(req.params.order_id, amount, reason);
-    res.json({ message: "Đã cập nhật phí phát sinh" });
-  } catch (err) {
-    res.status(400).json({ error: err.message });
+    const result = await rentalOrderService.cancelPendingOrder(userId, orderId);
+    return res.status(200).json(result);
+  } catch (error) {
+    // Lỗi 404 (không tìm thấy) hoặc 403 (không có quyền)
+    if (
+      error.message.includes("Không tìm thấy") ||
+      error.message.includes("Không có quyền") ||
+      error.message.includes("Không thể hủy")
+    ) {
+      return res.status(404).json({ error: error.message });
+    }
+    return res.status(500).json({ error: error.message });
   }
-}
+};
 
-async function handleDeleteOrder(req, res) {
+// POST /api/orders/webhook/cron (Bước 3, TH2 - Dùng cho Cron)
+// (Endpoint này nên được bảo vệ bằng secret key)
+const handleCronJob = async (req, res) => {
   try {
-    await removeOrder(req.params.order_id);
-    res.json({ message: "Đã xóa đơn thuê" });
-  } catch (err) {
-    res.status(400).json({ error: err.message });
+    // Đảm bảo chỉ có hệ thống mới gọi được
+    if (req.headers["x-cron-secret"] !== process.env.CRON_SECRET) {
+      return res.status(403).json({ error: "Forbidden" });
+    }
+    // Chạy ngầm, không cần await
+    rentalOrderService.processExpiredOrders();
+    return res.status(202).json({ message: "Cron job triggered." });
+  } catch (error) {
+    return res.status(500).json({ error: error.message });
   }
-}
+};
+
+// PATCH /api/orders/:id/pickup (Bước 4 - Admin)
+const handlePickupOrder = async (req, res) => {
+  try {
+    const adminId = req.USER_ID; // Lấy từ authMiddleware (admin)
+    const orderId = parseInt(req.params.id);
+    const { cashAmount } = req.body; // Tiền mặt thu (nếu là đơn cọc)
+
+    const result = await rentalOrderService.confirmOrderPickup(
+      orderId,
+      adminId,
+      { amount: cashAmount }
+    );
+    return res.status(200).json(result);
+  } catch (error) {
+    if (
+      error.message.includes("Không tìm thấy") ||
+      error.message.includes("không ở trạng thái")
+    ) {
+      return res.status(400).json({ error: error.message });
+    }
+    return res.status(500).json({ error: error.message });
+  }
+};
+
+// PATCH /api/orders/:id/complete (Bước 5 - Admin)
+const handleCompleteOrder = async (req, res) => {
+  try {
+    const adminId = req.USER_ID; // Lấy từ authMiddleware (admin)
+    const orderId = parseInt(req.params.id);
+    const { extraFee, note, carStatus } = req.body;
+
+    const result = await rentalOrderService.completeOrder(
+      orderId,
+      adminId,
+      extraFee,
+      note,
+      carStatus
+    );
+    return res.status(200).json(result);
+  } catch (error) {
+    if (
+      error.message.includes("Không tìm thấy") ||
+      error.message.includes("không ở trạng thái")
+    ) {
+      return res.status(400).json({ error: error.message });
+    }
+    return res.status(500).json({ error: error.message });
+  }
+};
+
+// PATCH /api/orders/:id/cancel-confirmed (Bước 6)
+const handleCancelConfirmedOrder = async (req, res) => {
+  try {
+    const userId = req.user.USER_ID;
+    const orderId = parseInt(req.params.id);
+
+    const result = await rentalOrderService.cancelConfirmedOrder(
+      userId,
+      orderId
+    );
+    return res.status(200).json(result);
+  } catch (error) {
+    if (
+      error.message.includes("Không tìm thấy") ||
+      error.message.includes("không ở trạng thái") ||
+      error.message.includes("Chỉ hủy được")
+    ) {
+      return res.status(400).json({ error: error.message });
+    }
+    return res.status(500).json({ error: error.message });
+  }
+};
 
 module.exports = {
   handleCreateOrder,
-  handleGetOrder,
-  handleGetUserOrders,
-  handleGetAllOrders,
-  handleUpdateStatus,
-  handleSetExtraFee,
-  handleDeleteOrder,
+  handleCancelPendingOrder,
+  handleCronJob,
+  handlePickupOrder,
+  handleCompleteOrder,
+  handleCancelConfirmedOrder,
 };

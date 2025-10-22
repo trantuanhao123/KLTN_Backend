@@ -1,39 +1,32 @@
 const paymentService = require("../services/paymentService");
 
-// 🟩 Tạo thanh toán bằng tiền mặt
-async function createCashPayment(req, res) {
+// POST /api/payments/webhook/payos (Bước 3, TH1)
+const handlePayOSWebhook = async (req, res) => {
   try {
-    const { order_id, amount } = req.body;
-    if (!order_id || !amount) {
-      return res.status(400).json({ message: "Thiếu order_id hoặc amount" });
-    }
+    // req.body chứa toàn bộ data PayOS gửi
+    await paymentService.handlePayOSWebhook(req.body);
 
-    const paymentId = await paymentService.createCashPayment(order_id, amount);
-    res.status(201).json({ message: "Thanh toán CASH thành công", paymentId });
-  } catch (err) {
-    res.status(500).json({ message: err.message });
-  }
-}
+    // Phải trả 200 OK để PayOS biết đã nhận
+    return res
+      .status(200)
+      .json({ success: true, message: "Webhook received." });
+  } catch (error) {
+    console.error("LỖI WEBHOOK CONTROLLER:", error.message);
 
-// 🟨 Lấy danh sách thanh toán theo ORDER_ID
-async function getPaymentByOrderId(req, res) {
-  try {
-    const { orderId } = req.params;
-    const payments = await paymentService.getPaymentByOrderId(orderId);
-
-    if (payments.length === 0) {
+    // Nếu lỗi xác thực, trả 400
+    if (error.message.includes("Invalid Signature")) {
       return res
-        .status(404)
-        .json({ message: "Không tìm thấy thanh toán cho ORDER_ID này" });
+        .status(400)
+        .json({ success: false, error: "Invalid Signature." });
     }
 
-    res.json(payments);
-  } catch (err) {
-    res.status(500).json({ message: err.message });
+    // Các lỗi 500 (lỗi DB, ...)
+    return res
+      .status(500)
+      .json({ success: false, error: "Internal processing error." });
   }
-}
+};
 
 module.exports = {
-  createCashPayment,
-  getPaymentByOrderId,
+  handlePayOSWebhook,
 };

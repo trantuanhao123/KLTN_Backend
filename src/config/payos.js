@@ -1,12 +1,10 @@
-import dotenv from "dotenv";
-import PayOS from "@payos/node";
+require("dotenv").config();
+const { PayOS } = require("@payos/node");
 
-dotenv.config();
+const payos = new PayOS(
+  process.env.PAYOS_CLIENT_ID,
+  process.env.PAYOS_API_KEY,
+  process.env.PAYOS_CHECKSUM_KEY
+);
 
-const payos = new PayOS({
-  clientId: process.env.PAYOS_CLIENT_ID,
-  apiKey: process.env.PAYOS_API_KEY,
-  apiHost: process.env.PAYOS_API_HOST,
-});
-
-export default payos;
+module.exports = payos;

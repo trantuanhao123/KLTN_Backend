@@ -1,11 +1,9 @@
 const express = require("express");
-const router = express.Router();
 const paymentController = require("../controllers/paymentController");
 
-// 🟩 Thanh toán bằng tiền mặt
-router.post("/cash", paymentController.createCashPayment);
+const router = express.Router();
 
-// 🟨 Lấy thanh toán theo order id
-router.get("/:orderId", paymentController.getPaymentByOrderId);
+// Bước 3, TH1: Endpoint nhận Webhook từ PayOS
+router.post("/webhook/payos", paymentController.handlePayOSWebhook);
 
 module.exports = router;

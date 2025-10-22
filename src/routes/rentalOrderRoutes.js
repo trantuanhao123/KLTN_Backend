@@ -1,24 +1,55 @@
 const express = require("express");
+const orderController = require("../controllers/rentalOrderController");
+
+// ✅ Import 2 middleware của bạn (đều là hàm)
+const authMiddleware = require("../middlewares/authMiddleware");
+const requireAdmin = require("../middlewares/requireAdmin"); // (Đảm bảo đường dẫn này đúng)
+
 const router = express.Router();
-const {
-  handleCreateOrder,
-  handleGetOrder,
-  handleGetUserOrders,
-  handleGetAllOrders,
-  handleUpdateStatus,
-  handleSetExtraFee,
-  handleDeleteOrder,
-} = require("../controllers/rentalOrderController");
 
-// USER
-router.post("/", handleCreateOrder);
-router.get("/:order_id", handleGetOrder);
-router.get("/user/:user_id", handleGetUserOrders);
-router.delete("/:order_id", handleDeleteOrder);
+// === User Routes ===
+// Yêu cầu: Đã đăng nhập (authMiddleware)
 
-// ADMIN
-router.get("/", handleGetAllOrders);
-router.patch("/status/:order_id", handleUpdateStatus);
-router.post("/extra-fee/:order_id", handleSetExtraFee);
+// Bước 2: Tạo đơn hàng
+router.post("/", authMiddleware, orderController.handleCreateOrder);
+
+// Bước 3, TH3: User tự hủy đơn (khi chưa thanh toán)
+router.patch(
+  "/:id/cancel-pending",
+  authMiddleware,
+  orderController.handleCancelPendingOrder
+);
+
+// Bước 6: User hủy đơn (khi đã thanh toán)
+router.patch(
+  "/:id/cancel-confirmed",
+  authMiddleware,
+  orderController.handleCancelConfirmedOrder
+);
+
+// === Admin Routes ===
+// Yêu cầu: Đã đăng nhập (authMiddleware) VÀ là Admin (requireAdmin)
+
+// Bước 4: Admin xác nhận bàn giao xe
+router.patch(
+  "/:id/pickup",
+  authMiddleware,
+  requireAdmin, // Kiểm tra admin
+  orderController.handlePickupOrder
+);
+
+// Bước 5: Admin xác nhận trả xe
+router.patch(
+  "/:id/complete",
+  authMiddleware,
+  requireAdmin, // Kiểm tra admin
+  orderController.handleCompleteOrder
+);
+
+// === System Routes ===
+// (Không cần auth, nhưng nên có secret key)
+
+// Bước 3, TH2: Cron job
+router.post("/webhook/cron", orderController.handleCronJob);
 
 module.exports = router;

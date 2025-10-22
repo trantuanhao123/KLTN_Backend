@@ -1,132 +1,91 @@
 const { connection } = require("../config/database");
 
-// 🟩 Tạo đơn thuê mới
-async function createRentalOrder(orderData) {
-  const [result] = await connection.execute(
-    `INSERT INTO RENTAL_ORDER 
-    (ORDER_CODE, USER_ID, CAR_ID, STATUS, START_DATE, END_DATE, PICKUP_BRANCH_ID, RETURN_BRANCH_ID,
-     RENTAL_PRICE, TOTAL_AMOUNT, FINAL_AMOUNT, DISCOUNT_ID, EXTRA_FEE, NOTE, PAID)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    [
-      orderData.order_code,
-      orderData.user_id,
-      orderData.car_id,
-      orderData.status,
-      orderData.start_date,
-      orderData.end_date,
-      orderData.pickup_branch_id,
-      orderData.return_branch_id,
-      orderData.rental_price,
-      orderData.total_amount,
-      orderData.final_amount,
-      orderData.discount_id,
-      orderData.extra_fee,
-      orderData.note,
-      orderData.paid,
-    ]
-  );
-  return result.insertId;
-}
+/**
+ * Tạo đơn hàng mới trong một transaction
+ * @param {object} orderData Dữ liệu đơn hàng (USER_ID, CAR_ID, ...)
+ * @param {object} conn Kết nối transaction
+ */
+const create = async (orderData, conn) => {
+  const sql = `
+    INSERT INTO RENTAL_ORDER (
+      ORDER_CODE, USER_ID, CAR_ID, STATUS, START_DATE, END_DATE,
+      RENTAL_PRICE, TOTAL_AMOUNT, FINAL_AMOUNT, PAYMENT_STATUS, EXPIRES_AT
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `;
+  // Giá trị mặc định khi khởi tạo (Bước 2)
+  const [result] = await conn.execute(sql, [
+    orderData.orderCode,
+    orderData.userId,
+    orderData.carId,
+    "PENDING_PAYMENT", // STATUS
+    orderData.startDate,
+    orderData.endDate,
+    orderData.rentalPrice,
+    orderData.totalAmount,
+    orderData.finalAmount, // Giả sử final = total khi chưa có discount
+    "UNPAID", // PAYMENT_STATUS
+    orderData.expiresAt, // Giờ hết hạn (NOW + 15p)
+  ]);
 
-// 🟦 Lấy đơn thuê theo ID
-async function getRentalOrderById(orderId) {
-  const [rows] = await connection.execute(
-    `SELECT o.*, u.FULLNAME, c.LICENSE_PLATE, c.BRAND, c.MODEL 
-     FROM RENTAL_ORDER o
-     JOIN USERS u ON o.USER_ID = u.USER_ID
-     JOIN CAR c ON o.CAR_ID = c.CAR_ID
-     WHERE o.ORDER_ID = ?`,
+  return {
+    orderId: result.insertId,
+    orderCode: orderData.orderCode,
+  };
+};
+
+/**
+ * Tìm đơn hàng bằng ORDER_CODE (dùng cho webhook)
+ */
+const findByCode = async (orderCode, conn = connection) => {
+  const [rows] = await conn.execute(
+    "SELECT * FROM RENTAL_ORDER WHERE ORDER_CODE = ?",
+    [orderCode]
+  );
+  return rows[0];
+};
+
+/**
+ * Tìm đơn hàng bằng ORDER_ID
+ */
+const findById = async (orderId, conn = connection) => {
+  const [rows] = await conn.execute(
+    "SELECT * FROM RENTAL_ORDER WHERE ORDER_ID = ?",
     [orderId]
   );
   return rows[0];
-}
+};
 
-// 🟨 Lấy đơn theo user
-async function getRentalOrdersByUser(userId) {
-  const [rows] = await connection.execute(
-    `SELECT * FROM RENTAL_ORDER WHERE USER_ID = ? ORDER BY CREATED_AT DESC`,
-    [userId]
+/**
+ * Cập nhật trạng thái đơn hàng (chung)
+ */
+const update = async (orderId, data, conn = connection) => {
+  const fields = Object.keys(data); // [ 'STATUS', 'PAYMENT_STATUS', 'EXTRA_FEE' ]
+  const values = Object.values(data); // [ 'CONFIRMED', 'PAID', 100000 ]
+
+  const setClause = fields.map((field) => `${field} = ?`).join(", "); // "STATUS = ?, PAYMENT_STATUS = ?, EXTRA_FEE = ?"
+
+  const sql = `UPDATE RENTAL_ORDER SET ${setClause} WHERE ORDER_ID = ?`;
+
+  const [result] = await conn.execute(sql, [...values, orderId]);
+  return result.affectedRows;
+};
+
+/**
+ * Lấy các đơn hàng PENDING_PAYMENT đã hết hạn (cho Cron Job - Bước 3, TH2)
+ */
+const findExpiredPendingOrders = async (conn = connection) => {
+  const [rows] = await conn.execute(
+    `SELECT ORDER_ID, CAR_ID 
+     FROM RENTAL_ORDER 
+     WHERE STATUS = 'PENDING_PAYMENT' AND EXPIRES_AT < NOW()`
   );
   return rows;
-}
-
-// 🟧 Lấy tất cả đơn
-async function getAllRentalOrders() {
-  const [rows] = await connection.execute(
-    `SELECT o.*, u.FULLNAME, c.LICENSE_PLATE, c.BRAND, c.MODEL 
-     FROM RENTAL_ORDER o
-     JOIN USERS u ON o.USER_ID = u.USER_ID
-     JOIN CAR c ON o.CAR_ID = c.CAR_ID
-     ORDER BY o.CREATED_AT DESC`
-  );
-  return rows;
-}
-
-// 🟥 Cập nhật trạng thái
-async function updateRentalOrderStatus(orderId, status) {
-  const [result] = await connection.execute(
-    `UPDATE RENTAL_ORDER SET STATUS = ? WHERE ORDER_ID = ?`,
-    [status, orderId]
-  );
-  return result.affectedRows > 0;
-}
-
-// 🟪 Cập nhật phí phát sinh (ghi đè, không cộng dồn)
-async function overwriteExtraFee(orderId, amount, note) {
-  const [result] = await connection.execute(
-    `UPDATE RENTAL_ORDER
-     SET EXTRA_FEE = ?, 
-         FINAL_AMOUNT = TOTAL_AMOUNT + ?, 
-         NOTE = ?, 
-         STATUS = 'FEE_INCURRED', 
-         PAID = 0
-     WHERE ORDER_ID = ?`,
-    [amount, amount, note || "Chi phí phát sinh", orderId]
-  );
-  return result.affectedRows > 0;
-}
-
-// 🟫 Xóa đơn thuê
-async function deleteRentalOrder(orderId) {
-  const conn = await connection.getConnection();
-  try {
-    await conn.beginTransaction();
-
-    // Lấy CAR_ID của đơn
-    const [rows] = await conn.execute(
-      `SELECT CAR_ID FROM RENTAL_ORDER WHERE ORDER_ID = ?`,
-      [orderId]
-    );
-    if (rows.length === 0) throw new Error("Không tìm thấy đơn hàng.");
-
-    const carId = rows[0].CAR_ID;
-
-    // Xóa đơn
-    await conn.execute(`DELETE FROM RENTAL_ORDER WHERE ORDER_ID = ?`, [
-      orderId,
-    ]);
-
-    // Cập nhật trạng thái xe về AVAILABLE
-    await conn.execute(`UPDATE CAR SET STATUS = 'AVAILABLE' WHERE CAR_ID = ?`, [
-      carId,
-    ]);
-
-    await conn.commit();
-    return true;
-  } catch (err) {
-    await conn.rollback();
-    throw err;
-  } finally {
-    conn.release();
-  }
-}
+};
 
 module.exports = {
-  createRentalOrder,
-  getRentalOrderById,
-  getRentalOrdersByUser,
-  getAllRentalOrders,
-  updateRentalOrderStatus,
-  overwriteExtraFee,
-  deleteRentalOrder,
+  create,
+  findById,
+  findByCode,
+  update,
+  findExpiredPendingOrders,
 };

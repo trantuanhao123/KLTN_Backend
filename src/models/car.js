@@ -160,7 +160,34 @@ const getAllCars = async () => {
   );
   return cars;
 };
-
+const getAllCarsUser = async (filters = {}) => {
+  // Basic: only available by default
+  const params = [];
+  let where = " WHERE 1=1 ";
+  if (filters.status) {
+    where += " AND C.STATUS = ? ";
+    params.push(filters.status);
+  } else {
+    // default show available
+    where += " AND C.STATUS = 'AVAILABLE' ";
+  }
+  if (filters.branchId) {
+    where += " AND C.BRANCH_ID = ? ";
+    params.push(filters.branchId);
+  }
+  const [rows] = await connection.execute(
+    `
+    SELECT 
+      C.*, 
+      (SELECT URL FROM CAR_IMAGE CI WHERE CI.CAR_ID = C.CAR_ID AND CI.IS_MAIN = 1 LIMIT 1) AS mainImageUrl
+    FROM CAR C
+    ${where}
+    ORDER BY FIELD(C.STATUS, 'AVAILABLE', 'RESERVED', 'RENTED', 'MAINTENANCE', 'DELETED'), C.CREATED_AT DESC
+    `,
+    params
+  );
+  return rows;
+};
 const deleteCar = async (carId) => {
   const [result] = await connection.execute(
     "UPDATE CAR SET STATUS = 'DELETED' WHERE CAR_ID = ?",
@@ -168,7 +195,12 @@ const deleteCar = async (carId) => {
   );
   return result.affectedRows;
 };
-
+const updateCarStatus = async (carId, status, conn = connection) => {
+  // if conn is pool, it will execute; if it's a transaction connection, it's fine too
+  const sql = `UPDATE CAR SET STATUS = ? WHERE CAR_ID = ?`;
+  const [res] = await conn.execute(sql, [status, carId]);
+  return res.affectedRows;
+};
 const updateCar = async (carId, carData, serviceIds) => {
   let conn = null;
   try {
@@ -244,4 +276,6 @@ module.exports = {
   getAllCars,
   deleteCar,
   updateCar,
+  getAllCarsUser,
+  updateCarStatus,
 };

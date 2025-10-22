@@ -1,9 +1,10 @@
 require("dotenv").config();
 const express = require("express");
 const configViewEngine = require("./config/viewengine");
-
+const cron = require("node-cron");
 const { checkConnection } = require("./config/database");
 
+const rentalOrderService = require("./services/rentalOrderService");
 const webRouter = require("./routes/web");
 const userRouter = require("./routes/userRoutes");
 const otpRouter = require("./routes/otpRoutes");
@@ -13,7 +14,6 @@ const branchRouter = require("./routes/branchRoutes");
 const categoryRouter = require("./routes/categoryRoutes");
 const carImageRouter = require("./routes/carImageRoutes");
 const bannerRouter = require("./routes/bannerRoutes");
-const payosRouter = require("./routes/payosRoutes");
 const rentalOrderRouter = require("./routes/rentalOrderRoutes");
 const paymentRouter = require("./routes/paymentRoutes");
 
@@ -40,10 +40,21 @@ app.use("/branch", branchRouter);
 app.use("/category", categoryRouter);
 app.use("/car-image", carImageRouter);
 app.use("/banner", bannerRouter);
-app.use("/payos", payosRouter);
 app.use("/order", rentalOrderRouter);
 app.use("/payment", paymentRouter);
 
+console.log("⏰ Đã lên lịch cho Cron Job (quét đơn hết hạn) chạy mỗi phút.");
+
+cron.schedule("* * * * *", async () => {
+  console.log("CRON: ⏰ Bắt đầu chạy tác vụ quét đơn hàng hết hạn...");
+  try {
+    // Gọi thẳng hàm service, không cần gọi qua API
+    await rentalOrderService.processExpiredOrders();
+    console.log("CRON: ✅ Tác vụ quét đơn đã hoàn tất.");
+  } catch (err) {
+    console.error("CRON: ❌ Lỗi khi đang chạy tác vụ quét đơn:", err.message);
+  }
+});
 // Hàm chính khởi động Server
 async function startServer() {
   try {
