@@ -5,7 +5,14 @@ const handleCreateOrder = async (req, res) => {
   try {
     // Giả sử userId được lấy từ authMiddleware
     const userId = req.user.USER_ID;
-    const { carId, startDate, endDate, rentalType, paymentOption } = req.body;
+    const {
+      carId,
+      startDate,
+      endDate,
+      rentalType,
+      paymentOption,
+      discountCode,
+    } = req.body;
 
     if (!carId || !startDate || !endDate) {
       return res.status(400).json({ error: "Thiếu thông tin bắt buộc." });
@@ -17,7 +24,8 @@ const handleCreateOrder = async (req, res) => {
       startDate,
       endDate,
       rentalType,
-      paymentOption
+      paymentOption,
+      discountCode
     );
 
     return res.status(201).json(paymentLink);

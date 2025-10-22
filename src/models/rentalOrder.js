@@ -1,18 +1,14 @@
 const { connection } = require("../config/database");
 
-/**
- * Tạo đơn hàng mới trong một transaction
- * @param {object} orderData Dữ liệu đơn hàng (USER_ID, CAR_ID, ...)
- * @param {object} conn Kết nối transaction
- */
 const create = async (orderData, conn) => {
   const sql = `
     INSERT INTO RENTAL_ORDER (
       ORDER_CODE, USER_ID, CAR_ID, STATUS, START_DATE, END_DATE,
-      RENTAL_PRICE, TOTAL_AMOUNT, FINAL_AMOUNT, PAYMENT_STATUS, EXPIRES_AT
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `;
-  // Giá trị mặc định khi khởi tạo (Bước 2)
+      RENTAL_PRICE, TOTAL_AMOUNT, FINAL_AMOUNT, PAYMENT_STATUS, EXPIRES_AT, 
+      DISCOUNT_ID 
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `; // <-- Thêm DISCOUNT_ID
+
   const [result] = await conn.execute(sql, [
     orderData.orderCode,
     orderData.userId,
@@ -22,9 +18,10 @@ const create = async (orderData, conn) => {
     orderData.endDate,
     orderData.rentalPrice,
     orderData.totalAmount,
-    orderData.finalAmount, // Giả sử final = total khi chưa có discount
+    orderData.finalAmount, // ⬅️ finalAmount này đã được giảm giá
     "UNPAID", // PAYMENT_STATUS
-    orderData.expiresAt, // Giờ hết hạn (NOW + 15p)
+    orderData.expiresAt,
+    orderData.discountId, // <-- Thêm giá trị discountId
   ]);
 
   return {

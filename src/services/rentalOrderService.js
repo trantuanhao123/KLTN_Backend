@@ -2,6 +2,7 @@ const { connection } = require("../config/database");
 const rentalOrderModel = require("../models/rentalOrder");
 const paymentModel = require("../models/payment");
 const carModel = require("../models/car");
+const discountModel = require("../models/discount");
 const payos = require("../config/payos");
 const { v4: uuidv4 } = require("uuid");
 
@@ -76,7 +77,8 @@ const createOrder = async (
   startDate,
   endDate,
   rentalType,
-  paymentOption
+  paymentOption,
+  discountCode
 ) => {
   let conn;
   try {
@@ -87,13 +89,45 @@ const createOrder = async (
 
     // 2. Tính toán giá
     const rentalPrice = calculatePrice(car, startDate, endDate, rentalType);
-    const totalAmount = rentalPrice; // Tạm thời = rentalPrice
-    const finalAmount = totalAmount; // Tạm thời = totalAmount
+    const totalAmount = rentalPrice; // Giá gốc
+
+    // ✅ SỬA LỖI Ở ĐÂY
+    let finalAmount = totalAmount; // Giá cuối cùng (phải là "let")
+
+    let discountId = null;
 
     // 3. Khởi tạo Transaction
     conn = await connection.getConnection();
     await conn.beginTransaction();
 
+    //Xử lý mã giảm giá
+    if (discountCode) {
+      // Tìm mã hợp lệ (trong transaction để lock)
+      const discount = await discountModel.findValidCode(discountCode, conn);
+
+      if (!discount) {
+        throw new Error("Mã giảm giá không hợp lệ hoặc đã hết hạn/hết lượt.");
+      }
+
+      // Tính toán giá trị giảm
+      let discountValue = 0;
+      if (discount.TYPE === "PERCENT") {
+        discountValue = totalAmount * (parseFloat(discount.VALUE) / 100);
+      } else {
+        // 'AMOUNT'
+        discountValue = parseFloat(discount.VALUE);
+      }
+
+      // Cập nhật giá cuối cùng
+      finalAmount = totalAmount - discountValue;
+      // Đảm bảo giá không âm
+      finalAmount = Math.max(0, finalAmount);
+
+      discountId = discount.DISCOUNT_ID;
+
+      // Cập nhật số lượng đã dùng
+      await discountModel.incrementUsedCount(discountId, conn);
+    }
     // 4. Tạo dữ liệu đơn hàng
     const orderCode = uuidv4(); // Tạo mã đơn hàng duy nhất
     const expiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 phút
@@ -104,10 +138,11 @@ const createOrder = async (
       carId,
       startDate,
       endDate,
-      rentalPrice,
-      totalAmount,
-      finalAmount,
+      rentalPrice, // Giá gốc chưa giảm
+      totalAmount, // Giá gốc chưa giảm
+      finalAmount, // Giá đã giảm
       expiresAt,
+      discountId, // ID của mã giảm giá (hoặc null)
     };
 
     // 5. DB Update (trong transaction)
