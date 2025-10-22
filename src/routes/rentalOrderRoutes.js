@@ -15,24 +15,32 @@ router.post("/", authMiddleware, orderController.handleCreateOrder);
 
 // Bước 3, TH3: User tự hủy đơn (khi chưa thanh toán)
 router.patch(
-  "/:id/cancel-pending",
+  "/cancel-pending/:id",
   authMiddleware,
   orderController.handleCancelPendingOrder
 );
 
-// Bước 6: User hủy đơn (khi đã thanh toán)
+// (CẬP NHẬT)
+// Bước 6A: User hủy đơn (khi đã cọc - mất cọc)
 router.patch(
-  "/:id/cancel-confirmed",
+  "/cancel-deposit/:id", // <-- Đổi tên route
   authMiddleware,
-  orderController.handleCancelConfirmedOrder
+  orderController.handleCancelDepositedOrder // <-- Đổi tên controller
 );
 
+// (MỚI)
+// Bước 6B: User hủy đơn (khi đã trả 100% - hoàn tiền)
+router.patch(
+  "/cancel-paid/:id", // <-- Route mới
+  authMiddleware,
+  orderController.handleCancelPaidOrder // <-- Controller mới
+);
 // === Admin Routes ===
 // Yêu cầu: Đã đăng nhập (authMiddleware) VÀ là Admin (requireAdmin)
 
 // Bước 4: Admin xác nhận bàn giao xe
 router.patch(
-  "/:id/pickup",
+  "/pickup/:id",
   authMiddleware,
   requireAdmin, // Kiểm tra admin
   orderController.handlePickupOrder

@@ -121,13 +121,13 @@ const handleCompleteOrder = async (req, res) => {
   }
 };
 
-// PATCH /api/orders/:id/cancel-confirmed (Bước 6)
-const handleCancelConfirmedOrder = async (req, res) => {
+// PATCH /api/orders/:id/cancel-deposit (Bước 6A)
+const handleCancelDepositedOrder = async (req, res) => {
   try {
     const userId = req.user.USER_ID;
     const orderId = parseInt(req.params.id);
 
-    const result = await rentalOrderService.cancelConfirmedOrder(
+    const result = await rentalOrderService.cancelDepositedOrder(
       userId,
       orderId
     );
@@ -136,7 +136,30 @@ const handleCancelConfirmedOrder = async (req, res) => {
     if (
       error.message.includes("Không tìm thấy") ||
       error.message.includes("không ở trạng thái") ||
-      error.message.includes("Chỉ hủy được")
+      error.message.includes("Chỉ hủy được") ||
+      error.message.includes("chỉ dùng để hủy đơn đã đặt cọc") // Lỗi mới
+    ) {
+      return res.status(400).json({ error: error.message });
+    }
+    return res.status(500).json({ error: error.message });
+  }
+};
+
+// (MỚI)
+// PATCH /api/orders/:id/cancel-paid (Bước 6B)
+const handleCancelPaidOrder = async (req, res) => {
+  try {
+    const userId = req.user.USER_ID;
+    const orderId = parseInt(req.params.id);
+
+    const result = await rentalOrderService.cancelPaidOrder(userId, orderId);
+    return res.status(200).json(result);
+  } catch (error) {
+    if (
+      error.message.includes("Không tìm thấy") ||
+      error.message.includes("không ở trạng thái") ||
+      error.message.includes("Chỉ hủy được") ||
+      error.message.includes("chỉ dùng để hủy đơn đã thanh toán") // Lỗi mới
     ) {
       return res.status(400).json({ error: error.message });
     }
@@ -150,5 +173,6 @@ module.exports = {
   handleCronJob,
   handlePickupOrder,
   handleCompleteOrder,
-  handleCancelConfirmedOrder,
+  handleCancelDepositedOrder,
+  handleCancelPaidOrder,
 };

@@ -3,6 +3,7 @@ const rentalOrderModel = require("../models/rentalOrder");
 const paymentModel = require("../models/payment");
 const carModel = require("../models/car");
 const discountModel = require("../models/discount");
+const notificationModel = require("../models/notification");
 const payos = require("../config/payos");
 const { v4: uuidv4 } = require("uuid");
 
@@ -407,7 +408,7 @@ const completeOrder = async (
 /**
  * Bước 6: Hủy đơn (Khi đã STATUS = 'CONFIRMED')
  */
-const cancelConfirmedOrder = async (userId, orderId) => {
+const cancelDepositedOrder = async (userId, orderId) => {
   let conn;
   try {
     conn = await connection.getConnection();
@@ -420,66 +421,118 @@ const cancelConfirmedOrder = async (userId, orderId) => {
       throw new Error("Chỉ hủy được đơn đã 'CONFIRMED'.");
     }
 
+    // Chỉ xử lý đơn cọc
+    if (order.PAYMENT_STATUS !== "PARTIAL") {
+      throw new Error("Chức năng này chỉ dùng để hủy đơn đã đặt cọc.");
+    }
+
     const totalPaid = await paymentModel.getTotalPaidByOrderId(orderId, conn);
     const orderUpdates = {
       STATUS: "CANCELLED",
+      EXTRA_FEE: totalPaid, // Phí hủy = tiền cọc
+      NOTE: "Hủy khi đã cọc. Áp dụng chính sách mất cọc.",
     };
 
-    // TH1: Mới cọc (Mất cọc)
-    if (order.PAYMENT_STATUS === "PARTIAL") {
-      orderUpdates.EXTRA_FEE = totalPaid; // Phí hủy = tiền cọc
-      orderUpdates.NOTE = "Hủy khi đã cọc. Áp dụng chính sách mất cọc.";
+    // 1. Cập nhật RENTAL_ORDER
+    await rentalOrderModel.update(orderId, orderUpdates, conn);
 
-      // Không hoàn tiền, chỉ cập nhật DB
-      await rentalOrderModel.update(orderId, orderUpdates, conn);
-      await carModel.updateCarStatus(order.CAR_ID, "AVAILABLE", conn);
+    // 2. Cập nhật CAR
+    await carModel.updateCarStatus(order.CAR_ID, "AVAILABLE", conn);
 
-      await conn.commit();
-      return { message: "Hủy đơn thành công (mất cọc)." };
-    }
+    // 3. (MỚI) Tạo thông báo cho user
+    await notificationModel.create(
+      {
+        USER_ID: order.USER_ID,
+        TITLE: `Đơn hàng ${order.ORDER_CODE} đã bị hủy (mất cọc)`,
+        CONTENT: `Bạn đã hủy đơn hàng ${order.ORDER_CODE}. Theo chính sách, khoản đặt cọc ${totalPaid}đ sẽ không được hoàn lại.`,
+      },
+      conn
+    );
 
-    // TH2: Đã trả 100% (Tính phí và hoàn tiền)
-    if (order.PAYMENT_STATUS === "PAID") {
-      // !! LOGIC TÍNH PHÍ (Giả định)
-      // Bạn cần thay bằng logic thực tế (dựa vào START_DATE)
-      const cancellationFee = order.FINAL_AMOUNT * 0.1; // Giả sử phí 10%
-      const refundAmount = totalPaid - cancellationFee;
-
-      orderUpdates.EXTRA_FEE = cancellationFee;
-      orderUpdates.NOTE = `Hủy khi đã trả 100%. Phí 10% (${cancellationFee}đ). Hoàn ${refundAmount}đ.`;
-
-      // 1. Cập nhật DB
-      await rentalOrderModel.update(orderId, orderUpdates, conn);
-      await carModel.updateCarStatus(order.CAR_ID, "AVAILABLE", conn);
-
-      // 2. Gọi API Refund PayOS (Bỏ qua nếu không dùng)
-      // const refundResult = await payos.refund(...);
-      // ... (Xử lý kết quả refund) ...
-
-      // 3. Ghi nhận giao dịch REFUND vào DB
-      await paymentModel.create(
-        {
-          orderId: orderId,
-          amount: -Math.abs(refundAmount), // Ghi số âm
-          paymentType: "REFUND",
-          method: "PayOS", // Hoặc 'CASH' nếu trả TM
-          status: "SUCCESS", // Giả sử refund thành công
-          transactionCode: `REFUND_${orderId}`,
-        },
-        conn
-      );
-
-      await conn.commit();
-      return {
-        message: `Hủy đơn thành công. Phí: ${cancellationFee}. Hoàn: ${refundAmount}.`,
-      };
-    }
-
-    // Trường hợp không xác định (lỗi logic)
-    throw new Error("Trạng thái thanh toán không xác định.");
+    await conn.commit();
+    return { message: "Hủy đơn thành công (mất cọc)." };
   } catch (error) {
     if (conn) await conn.rollback();
-    console.error("Lỗi khi hủy đơn CONFIRMED (Service):", error);
+    console.error("Lỗi khi hủy đơn cọc (Service):", error);
+    throw new Error(error.message || "Lỗi hệ thống.");
+  } finally {
+    if (conn) conn.release();
+  }
+};
+
+/**
+ * (MỚI)
+ * Bước 6B: Hủy đơn (Khi đã THANH TOÁN 100% - Hoàn tiền)
+ */
+const cancelPaidOrder = async (userId, orderId) => {
+  let conn;
+  try {
+    conn = await connection.getConnection();
+    await conn.beginTransaction();
+
+    const order = await rentalOrderModel.findById(orderId, conn);
+    if (!order) throw new Error("Không tìm thấy đơn hàng.");
+    if (order.USER_ID !== userId) throw new Error("Không có quyền truy cập.");
+    if (order.STATUS !== "CONFIRMED") {
+      throw new Error("Chỉ hủy được đơn đã 'CONFIRMED'.");
+    }
+
+    // Chỉ xử lý đơn đã PAID
+    if (order.PAYMENT_STATUS !== "PAID") {
+      throw new Error("Chức năng này chỉ dùng để hủy đơn đã thanh toán 100%.");
+    }
+
+    const totalPaid = await paymentModel.getTotalPaidByOrderId(orderId, conn);
+
+    // !! LOGIC TÍNH PHÍ (Giả định)
+    // Bạn cần thay bằng logic thực tế (dựa vào START_DATE)
+    const cancellationFee = order.FINAL_AMOUNT * 0.1; // Giả sử phí 10%
+    const refundAmount = totalPaid - cancellationFee;
+
+    const orderUpdates = {
+      STATUS: "CANCELLED",
+      EXTRA_FEE: cancellationFee,
+      NOTE: `Hủy khi đã trả 100%. Phí 10% (${cancellationFee}đ). Hoàn ${refundAmount}đ.`,
+    };
+
+    // 1. Cập nhật DB
+    await rentalOrderModel.update(orderId, orderUpdates, conn);
+    await carModel.updateCarStatus(order.CAR_ID, "AVAILABLE", conn);
+
+    // 2. Gọi API Refund PayOS (Bỏ qua nếu không dùng)
+    // const refundResult = await payos.refund(...);
+    // ... (Xử lý kết quả refund) ...
+
+    // 3. Ghi nhận giao dịch REFUND vào DB
+    await paymentModel.create(
+      {
+        orderId: orderId,
+        amount: -Math.abs(refundAmount), // Ghi số âm
+        paymentType: "REFUND",
+        method: "PayOS", // Hoặc 'CASH' nếu trả TM
+        status: "SUCCESS", // Giả sử refund thành công
+        transactionCode: `REFUND_${orderId}`,
+      },
+      conn
+    );
+
+    // 4. (MỚI) Tạo thông báo
+    await notificationModel.create(
+      {
+        USER_ID: order.USER_ID,
+        TITLE: `Đơn hàng ${order.ORDER_CODE} đã được hủy và hoàn tiền`,
+        CONTENT: `Bạn đã hủy đơn hàng ${order.ORDER_CODE}. Phí hủy là ${cancellationFee}đ. Khoản tiền ${refundAmount}đ sẽ được hoàn lại cho bạn.`,
+      },
+      conn
+    );
+
+    await conn.commit();
+    return {
+      message: `Hủy đơn thành công. Phí: ${cancellationFee}. Hoàn: ${refundAmount}.`,
+    };
+  } catch (error) {
+    if (conn) await conn.rollback();
+    console.error("Lỗi khi hủy đơn PAID (Service):", error);
     throw new Error(error.message || "Lỗi hệ thống.");
   } finally {
     if (conn) conn.release();
@@ -492,5 +545,6 @@ module.exports = {
   processExpiredOrders,
   confirmOrderPickup,
   completeOrder,
-  cancelConfirmedOrder,
+  cancelDepositedOrder,
+  cancelPaidOrder,
 };
