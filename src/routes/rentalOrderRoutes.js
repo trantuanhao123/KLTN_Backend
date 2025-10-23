@@ -1,9 +1,8 @@
 const express = require("express");
 const orderController = require("../controllers/rentalOrderController");
 
-// ✅ Import 2 middleware của bạn (đều là hàm)
 const authMiddleware = require("../middlewares/authMiddleware");
-const requireAdmin = require("../middlewares/requireAdmin"); // (Đảm bảo đường dẫn này đúng)
+const requireAdmin = require("../middlewares/requireAdmin");
 
 const router = express.Router();
 
@@ -53,7 +52,53 @@ router.patch(
   requireAdmin, // Kiểm tra admin
   orderController.handleCompleteOrder
 );
+// [MỚI] Admin: Lấy tất cả đơn hàng (kèm số lượng giao dịch)
+router.get(
+  "/",
+  authMiddleware,
+  requireAdmin,
+  orderController.handleAdminGetAllOrders
+);
 
+// [MỚI] Admin: Lấy chi tiết 1 đơn hàng (kèm danh sách giao dịch)
+router.get(
+  "/:id",
+  authMiddleware,
+  requireAdmin,
+  orderController.handleAdminGetOrderById
+);
+
+// [MỚI] Admin: Xóa cứng 1 đơn hàng
+router.delete(
+  "/:id",
+  authMiddleware,
+  requireAdmin,
+  orderController.handleAdminHardDeleteOrder
+);
+
+// [MỚI] Admin: Lấy lịch sử thuê của một user cụ thể
+router.get(
+  "/user/:userId",
+  authMiddleware,
+  requireAdmin,
+  orderController.handleAdminGetUserOrders
+);
+
+// [MỚI] Admin: Tự tạo đơn (Manual Order)
+router.post(
+  "/admin/create",
+  authMiddleware,
+  requireAdmin,
+  orderController.handleAdminCreateManualOrder
+);
+
+// [MỚI] Admin: Cập nhật/sửa đơn hàng
+router.patch(
+  "/admin/update/:id",
+  authMiddleware,
+  requireAdmin,
+  orderController.handleAdminUpdateOrder
+);
 // === System Routes ===
 // (Không cần auth, nhưng nên có secret key)
 

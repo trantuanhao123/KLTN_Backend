@@ -152,14 +152,33 @@ const handleCancelPaidOrder = async (req, res) => {
     const userId = req.user.USER_ID;
     const orderId = parseInt(req.params.id);
 
-    const result = await rentalOrderService.cancelPaidOrder(userId, orderId);
+    // [SỬA] Lấy thông tin hoàn tiền từ body
+    const { bankAccount, bankName } = req.body;
+
+    // [SỬA] Validate input STK
+    if (!bankAccount || !bankName) {
+      return res.status(400).json({
+        error: "Vui lòng cung cấp Số tài khoản và Tên ngân hàng để hoàn tiền.",
+      });
+    }
+
+    const refundInfo = { bankAccount, bankName };
+
+    // [SỬA] Truyền thêm refundInfo vào service
+    const result = await rentalOrderService.cancelPaidOrder(
+      userId,
+      orderId,
+      refundInfo
+    );
+
     return res.status(200).json(result);
   } catch (error) {
     if (
       error.message.includes("Không tìm thấy") ||
       error.message.includes("không ở trạng thái") ||
       error.message.includes("Chỉ hủy được") ||
-      error.message.includes("chỉ dùng để hủy đơn đã thanh toán") // Lỗi mới
+      error.message.includes("chỉ dùng để hủy đơn đã thanh toán") ||
+      error.message.includes("Vui lòng cung cấp") // [SỬA] Bắt lỗi validate mới
     ) {
       return res.status(400).json({ error: error.message });
     }
@@ -167,6 +186,124 @@ const handleCancelPaidOrder = async (req, res) => {
   }
 };
 
+/**
+ * [MỚI] GET /api/orders/admin/all (Admin)
+ */
+const handleAdminGetAllOrders = async (req, res) => {
+  try {
+    const orders = await rentalOrderService.adminGetAllOrders();
+    return res.status(200).json(orders);
+  } catch (error) {
+    return res.status(500).json({ error: error.message });
+  }
+};
+
+/**
+ * [MỚI] GET /api/orders/admin/:id (Admin)
+ */
+const handleAdminGetOrderById = async (req, res) => {
+  try {
+    const orderId = parseInt(req.params.id);
+    const orderDetails = await rentalOrderService.adminGetOrderById(orderId);
+    return res.status(200).json(orderDetails);
+  } catch (error) {
+    if (error.message.includes("Không tìm thấy")) {
+      return res.status(404).json({ error: error.message });
+    }
+    return res.status(500).json({ error: error.message });
+  }
+};
+
+/**
+ * [MỚI] DELETE /api/orders/admin/:id (Admin)
+ */
+const handleAdminHardDeleteOrder = async (req, res) => {
+  try {
+    const orderId = parseInt(req.params.id);
+    const adminId = req.USER_ID; // Lấy từ authMiddleware (admin)
+
+    const result = await rentalOrderService.adminHardDeleteOrder(
+      orderId,
+      adminId
+    );
+    return res.status(200).json(result);
+  } catch (error) {
+    if (error.message.includes("Không tìm thấy")) {
+      return res.status(404).json({ error: error.message });
+    }
+    return res.status(500).json({ error: error.message });
+  }
+};
+
+/**
+ * [MỚI] GET /api/orders/admin/user/:userId (Admin)
+ */
+const handleAdminGetUserOrders = async (req, res) => {
+  try {
+    const userId = parseInt(req.params.userId);
+    if (isNaN(userId)) {
+      return res.status(400).json({ error: "USER_ID không hợp lệ." });
+    }
+    const orders = await rentalOrderService.adminGetUserOrders(userId);
+    return res.status(200).json(orders);
+  } catch (error) {
+    if (error.message.includes("Không tìm thấy")) {
+      return res.status(404).json({ error: error.message });
+    }
+    return res.status(500).json({ error: error.message });
+  }
+};
+
+/**
+ * [MỚI] POST /api/orders/admin/manual-create (Admin)
+ */
+const handleAdminCreateManualOrder = async (req, res) => {
+  try {
+    const adminId = req.USER_ID; // Lấy từ authMiddleware (admin)
+    const orderDetails = req.body;
+
+    // (Thêm validate chi tiết cho orderDetails ở đây)
+    if (!orderDetails.userId || !orderDetails.carId) {
+      return res.status(400).json({ error: "Thiếu thông tin User hoặc Xe." });
+    }
+
+    const result = await rentalOrderService.adminCreateManualOrder(
+      adminId,
+      orderDetails
+    );
+    return res.status(201).json(result);
+  } catch (error) {
+    return res.status(500).json({ error: error.message });
+  }
+};
+
+/**
+ * [MỚI] PATCH /api/orders/admin/update/:id (Admin)
+ */
+const handleAdminUpdateOrder = async (req, res) => {
+  try {
+    const orderId = parseInt(req.params.id);
+    const updateData = req.body;
+
+    const result = await rentalOrderService.adminUpdateOrder(
+      orderId,
+      updateData
+    );
+    return res.status(200).json(result);
+  } catch (error) {
+    if (
+      error.message.includes("Không tìm thấy") ||
+      error.message.includes("không hợp lệ") ||
+      error.message.includes("không khả dụng")
+    ) {
+      return res.status(404).json({ error: error.message });
+    }
+    if (error.message.includes("Chỉ có thể cập nhật")) {
+      return res.status(400).json({ error: error.message });
+    }
+    return res.status(500).json({ error: error.message });
+  }
+};
 module.exports = {
   handleCreateOrder,
   handleCancelPendingOrder,
@@ -175,4 +312,10 @@ module.exports = {
   handleCompleteOrder,
   handleCancelDepositedOrder,
   handleCancelPaidOrder,
+  handleAdminGetAllOrders,
+  handleAdminGetOrderById,
+  handleAdminHardDeleteOrder,
+  handleAdminGetUserOrders,
+  handleAdminCreateManualOrder,
+  handleAdminUpdateOrder,
 };

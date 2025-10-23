@@ -26,7 +26,44 @@ const handlePayOSWebhook = async (req, res) => {
       .json({ success: false, error: "Internal processing error." });
   }
 };
+/**
+ * [MỚI] GET /api/payments/admin/refunds-pending
+ */
+const handleAdminGetPendingRefunds = async (req, res) => {
+  try {
+    const refunds = await paymentService.adminGetPendingRefunds();
+    return res.status(200).json(refunds);
+  } catch (error) {
+    return res.status(500).json({ error: error.message });
+  }
+};
 
+/**
+ * [MỚI] PATCH /api/payments/admin/confirm-refund/:paymentId
+ */
+const handleAdminConfirmRefund = async (req, res) => {
+  try {
+    const paymentId = parseInt(req.params.paymentId);
+    const adminId = req.USER_ID; // Lấy từ authMiddleware (admin)
+
+    if (isNaN(paymentId)) {
+      return res.status(400).json({ error: "PAYMENT_ID không hợp lệ." });
+    }
+
+    const result = await paymentService.adminConfirmRefund(paymentId, adminId);
+    return res.status(200).json(result);
+  } catch (error) {
+    if (
+      error.message.includes("Không tìm thấy") ||
+      error.message.includes("không hợp lệ")
+    ) {
+      return res.status(404).json({ error: error.message });
+    }
+    return res.status(500).json({ error: error.message });
+  }
+};
 module.exports = {
   handlePayOSWebhook,
+  handleAdminGetPendingRefunds,
+  handleAdminConfirmRefund,
 };

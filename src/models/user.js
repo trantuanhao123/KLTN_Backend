@@ -180,7 +180,13 @@ async function verifyUser(userId) {
   const [result] = await connection.query(sql, [userId]);
   return result.affectedRows;
 }
-
+async function findByRole(role, conn = connection) {
+  const [rows] = await conn.query(
+    `SELECT * FROM USERS WHERE ROLE = ? AND IS_DELETED = 0 LIMIT 1`,
+    [role]
+  );
+  return rows[0];
+}
 module.exports = {
   create,
   findByEmail,
@@ -195,4 +201,5 @@ module.exports = {
   reActiveById,
   updateUnverifiedUser,
   setEmailAsVerified,
+  findByRole,
 };

@@ -13,13 +13,13 @@ const create = async (orderData, conn) => {
     orderData.orderCode,
     orderData.userId,
     orderData.carId,
-    "PENDING_PAYMENT", // STATUS
+    orderData.status || "PENDING_PAYMENT", // STATUS
     orderData.startDate,
     orderData.endDate,
     orderData.rentalPrice,
     orderData.totalAmount,
     orderData.finalAmount, // ⬅️ finalAmount này đã được giảm giá
-    "UNPAID", // PAYMENT_STATUS
+    orderData.paymentStatus || "UNPAID", // PAYMENT_STATUS
     orderData.expiresAt,
     orderData.discountId, // <-- Thêm giá trị discountId
   ]);
@@ -78,11 +78,47 @@ const findExpiredPendingOrders = async (conn = connection) => {
   );
   return rows;
 };
+/**
+ * [MỚI] (Admin) Lấy tất cả đơn hàng, kèm theo số lượng giao dịch
+ */
+const adminGetAllWithTxCount = async (conn = connection) => {
+  const sql = `
+    SELECT
+      ro.*,
+      (SELECT COUNT(*) FROM PAYMENT p WHERE p.ORDER_ID = ro.ORDER_ID) AS transactionCount
+    FROM RENTAL_ORDER ro
+    ORDER BY ro.CREATED_AT DESC
+  `;
+  const [rows] = await conn.execute(sql);
+  return rows;
+};
 
+/**
+ * [MỚI] (Admin) Xóa cứng một đơn hàng
+ * (Lưu ý: Bảng PAYMENT đã có ON DELETE CASCADE nên sẽ tự xóa theo)
+ */
+const hardDeleteById = async (orderId, conn = connection) => {
+  const sql = `DELETE FROM RENTAL_ORDER WHERE ORDER_ID = ?`;
+  const [result] = await conn.execute(sql, [orderId]);
+  return result.affectedRows;
+};
+/**
+ * [MỚI] (Admin) Lấy tất cả đơn hàng của một User
+ */
+const findByUserId = async (userId, conn = connection) => {
+  const [rows] = await conn.execute(
+    "SELECT * FROM RENTAL_ORDER WHERE USER_ID = ? ORDER BY CREATED_AT DESC",
+    [userId]
+  );
+  return rows;
+};
 module.exports = {
   create,
   findById,
   findByCode,
+  findByUserId,
   update,
   findExpiredPendingOrders,
+  adminGetAllWithTxCount,
+  hardDeleteById,
 };

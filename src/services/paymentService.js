@@ -2,6 +2,7 @@ const { connection } = require("../config/database");
 const payos = require("../config/payos");
 const rentalOrderModel = require("../models/rentalOrder");
 const paymentModel = require("../models/payment");
+const notificationModel = require("../models/notification");
 
 const handlePayOSWebhook = async (webhookBody) => {
   let conn;
@@ -104,7 +105,69 @@ const handlePayOSWebhook = async (webhookBody) => {
     if (conn) conn.release();
   }
 };
+/**
+ * [MỚI] (Admin) Lấy danh sách chờ hoàn tiền
+ */
+const adminGetPendingRefunds = async () => {
+  try {
+    const refunds = await paymentModel.getPendingRefunds();
+    return refunds;
+  } catch (error) {
+    console.error("Lỗi khi lấy ds hoàn tiền (Service):", error);
+    throw new Error(error.message || "Lỗi hệ thống.");
+  }
+};
 
+/**
+ * [MỚI] (Admin) Xác nhận đã hoàn tiền
+ */
+const adminConfirmRefund = async (paymentId, adminId) => {
+  let conn;
+  try {
+    conn = await connection.getConnection();
+    await conn.beginTransaction();
+
+    // 1. Lấy thông tin giao dịch
+    const payment = await paymentModel.findById(paymentId, conn);
+    if (!payment) {
+      throw new Error("Không tìm thấy giao dịch hoàn tiền.");
+    }
+    if (payment.PAYMENT_TYPE !== "REFUND" || payment.STATUS !== "PROCESSING") {
+      throw new Error("Giao dịch không hợp lệ hoặc đã được xử lý.");
+    }
+
+    // 2. Cập nhật trạng thái payment thành 'REFUNDED' (theo ENUM)
+    await paymentModel.updateStatus(paymentId, "REFUNDED", conn);
+
+    // 3. Lấy thông tin user để gửi thông báo
+    const order = await rentalOrderModel.findById(payment.ORDER_ID, conn);
+
+    // 4. Gửi thông báo cho user
+    if (order) {
+      await notificationModel.create(
+        {
+          USER_ID: order.USER_ID,
+          TITLE: `Đã hoàn tiền cho đơn ${order.ORDER_CODE}`,
+          CONTENT: `Khoản hoàn tiền ${Math.abs(payment.AMOUNT)}đ cho đơn hàng ${
+            order.ORDER_CODE
+          } đã được xử lý. Tiền sẽ về tài khoản của bạn sau vài phút.`,
+        },
+        conn
+      );
+    }
+
+    await conn.commit();
+    return { message: "Xác nhận hoàn tiền thành công." };
+  } catch (error) {
+    if (conn) await conn.rollback();
+    console.error("Lỗi khi xác nhận hoàn tiền (Service):", error);
+    throw new Error(error.message || "Lỗi hệ thống.");
+  } finally {
+    if (conn) conn.release();
+  }
+};
 module.exports = {
   handlePayOSWebhook,
+  adminGetPendingRefunds,
+  adminConfirmRefund,
 };
