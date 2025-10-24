@@ -145,6 +145,8 @@ const createOrder = async (
       finalAmount, // Giá đã giảm
       expiresAt,
       discountId, // ID của mã giảm giá (hoặc null)
+      pickupBranchId: car.BRANCH_ID,
+      returnBranchId: car.BRANCH_ID,
     };
 
     // 5. DB Update (trong transaction)
@@ -167,8 +169,8 @@ const createOrder = async (
       orderCode: orderId,
       amount: amountToPay,
       description: description,
-      cancelUrl: `${process.env.FRONTEND_URL}/cancel`,
-      returnUrl: `${process.env.FRONTEND_URL}/result`,
+      cancelUrl: `${process.env.RESULT_URL}/cancel`,
+      returnUrl: `${process.env.RESULT_URL}/result`,
       signature: undefined,
     };
 
@@ -299,20 +301,42 @@ const confirmOrderPickup = async (orderId, adminId, cashPaymentData) => {
     }
 
     const updates = {
-      STATUS: "IN_PROGRESS", // Cập nhật chung
+      STATUS: "IN_PROGRESS",
     };
 
-    // TH1: Đơn cọc (PARTIAL), Admin thu tiền mặt
+    // TH1: Đơn cọc (PARTIAL)
     if (order.PAYMENT_STATUS === "PARTIAL") {
       if (!cashPaymentData || !cashPaymentData.amount) {
         throw new Error("Cần nhập số tiền mặt đã thu (90% còn lại).");
       }
 
-      // 1. INSERT INTO PAYMENT (thu tiền mặt)
+      // --- [CẢI TIẾN BẮT ĐẦU TỪ ĐÂY] ---
+
+      // 1. Lấy số tiền đã cọc
+      const totalPaid = await paymentModel.getTotalPaidByOrderId(orderId, conn);
+
+      // 2. Tính số tiền CẦN THU
+      const remainingAmount = order.FINAL_AMOUNT - totalPaid;
+
+      // 3. Lấy số tiền admin NHẬP
+      const adminInputAmount = parseFloat(cashPaymentData.amount);
+
+      // 4. So sánh
+      if (adminInputAmount !== remainingAmount) {
+        // Làm tròn để tránh lỗi javascript (ví dụ: 100.01 vs 100.009)
+        if (Math.round(adminInputAmount) !== Math.round(remainingAmount)) {
+          throw new Error(
+            `Số tiền thu không khớp. Hệ thống yêu cầu ${remainingAmount}đ, bạn đã nhập ${adminInputAmount}đ.`
+          );
+        }
+      }
+      // --- [CẢI TIẾN KẾT THÚC] ---
+
+      // 5. Ghi nhận giao dịch (nếu đã qua bước kiểm tra)
       await paymentModel.create(
         {
           orderId: orderId,
-          amount: cashPaymentData.amount, // Số tiền admin nhập
+          amount: adminInputAmount, // Dùng số tiền admin đã nhập
           paymentType: "FINAL_PAYMENT",
           method: "CASH",
           status: "SUCCESS",
@@ -321,15 +345,11 @@ const confirmOrderPickup = async (orderId, adminId, cashPaymentData) => {
         conn
       );
 
-      // 2. UPDATE RENTAL_ORDER
       updates.PAYMENT_STATUS = "PAID";
     }
     // TH2: Đã PAID (trả 100%), bỏ qua
 
-    // Cập nhật chung
     await rentalOrderModel.update(orderId, updates, conn);
-
-    // Cập nhật xe
     await carModel.updateCarStatus(order.CAR_ID, "RENTED", conn);
 
     await conn.commit();
@@ -585,20 +605,43 @@ const cancelPaidOrder = async (userId, orderId, refundInfo) => {
 };
 
 /**
- * [MỚI] (Admin) Lấy tất cả đơn hàng (kèm số lượng giao dịch)
+ * [SỬA ĐỔI] (Admin) Lấy tất cả đơn hàng (kèm số lượng giao dịch và tiền còn lại)
  */
 const adminGetAllOrders = async () => {
   try {
+    // 1. Hàm này giờ trả về thêm "totalPaid"
     const orders = await rentalOrderModel.adminGetAllWithTxCount();
-    return orders;
+
+    // 2. Map qua kết quả để tính toán
+    const ordersWithRemaining = orders.map((order) => {
+      let remainingAmount = 0;
+
+      // 3. Nếu là đơn cọc (PARTIAL)
+      if (order.PAYMENT_STATUS === "PARTIAL") {
+        // Lấy tổng tiền đã trả (từ SQL, có thể là null nếu chưa có)
+        const totalPaid = parseFloat(order.totalPaid || 0);
+
+        // Tính số tiền còn lại
+        remainingAmount = order.FINAL_AMOUNT - totalPaid;
+      }
+
+      // 4. Xóa trường 'totalPaid' (không cần thiết) và thêm 'remainingAmount'
+      const { totalPaid, ...restOfOrder } = order;
+
+      return {
+        ...restOfOrder,
+        remainingAmount: Math.max(0, remainingAmount), // Đảm bảo không bị âm
+      };
+    });
+
+    return ordersWithRemaining;
   } catch (error) {
     console.error("Lỗi khi lấy tất cả đơn hàng (Service):", error);
     throw new Error(error.message || "Lỗi hệ thống.");
   }
 };
-
 /**
- * [MỚI] (Admin) Lấy chi tiết đơn hàng (kèm danh sách giao dịch)
+ * [SỬA ĐỔI] (Admin) Lấy chi tiết đơn hàng (kèm danh sách giao dịch và tiền còn lại)
  */
 const adminGetOrderById = async (orderId) => {
   try {
@@ -611,9 +654,25 @@ const adminGetOrderById = async (orderId) => {
     // 2. Lấy tất cả giao dịch liên quan
     const payments = await paymentModel.findByOrderId(orderId);
 
-    // 3. Gộp lại
+    // --- [LOGIC MỚI BẮT ĐẦU TỪ ĐÂY] ---
+    let remainingAmount = 0;
+
+    // 3. Nếu là đơn cọc (PARTIAL)
+    if (order.PAYMENT_STATUS === "PARTIAL") {
+      // Tính tổng tiền đã trả từ danh sách 'payments'
+      const totalPaid = payments
+        .filter((p) => p.STATUS === "SUCCESS" && p.AMOUNT > 0) // Chỉ tính giao dịch thành công, dương
+        .reduce((sum, p) => sum + parseFloat(p.AMOUNT), 0);
+
+      // Tính số tiền còn lại
+      remainingAmount = order.FINAL_AMOUNT - totalPaid;
+    }
+    // --- [LOGIC MỚI KẾT THÚC] ---
+
+    // 4. Gộp lại
     return {
       ...order,
+      remainingAmount: Math.max(0, remainingAmount), // Thêm trường mới
       payments: payments, // Thêm danh sách giao dịch vào chi tiết
     };
   } catch (error) {
@@ -732,6 +791,8 @@ const adminCreateManualOrder = async (adminId, orderDetails) => {
       status: "CONFIRMED", // Admin tạo là xác nhận luôn
       paymentStatus: paymentStatus,
       NOTE: note || "Đơn hàng tạo bởi Admin",
+      pickupBranchId: car.BRANCH_ID,
+      returnBranchId: car.BRANCH_ID,
     };
 
     // 4. INSERT RENTAL_ORDER

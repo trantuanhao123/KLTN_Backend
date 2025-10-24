@@ -1,27 +1,28 @@
 const { connection } = require("../config/database");
 
 const create = async (orderData, conn) => {
-  const sql = `
-    INSERT INTO RENTAL_ORDER (
+  // Đã dọn dẹp các ký tự trắng vô hình
+  const sql = `INSERT INTO RENTAL_ORDER (
       ORDER_CODE, USER_ID, CAR_ID, STATUS, START_DATE, END_DATE,
-      RENTAL_PRICE, TOTAL_AMOUNT, FINAL_AMOUNT, PAYMENT_STATUS, EXPIRES_AT, 
-      DISCOUNT_ID 
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `; // <-- Thêm DISCOUNT_ID
+      RENTAL_PRICE, TOTAL_AMOUNT, FINAL_AMOUNT, PAYMENT_STATUS, EXPIRES_AT,
+      DISCOUNT_ID, PICKUP_BRANCH_ID, RETURN_BRANCH_ID
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
 
   const [result] = await conn.execute(sql, [
     orderData.orderCode,
     orderData.userId,
     orderData.carId,
-    orderData.status || "PENDING_PAYMENT", // STATUS
+    orderData.status || "PENDING_PAYMENT",
     orderData.startDate,
     orderData.endDate,
     orderData.rentalPrice,
     orderData.totalAmount,
-    orderData.finalAmount, // ⬅️ finalAmount này đã được giảm giá
-    orderData.paymentStatus || "UNPAID", // PAYMENT_STATUS
+    orderData.finalAmount,
+    orderData.paymentStatus || "UNPAID",
     orderData.expiresAt,
-    orderData.discountId, // <-- Thêm giá trị discountId
+    orderData.discountId,
+    orderData.pickupBranchId,
+    orderData.returnBranchId,
   ]);
 
   return {
@@ -79,13 +80,21 @@ const findExpiredPendingOrders = async (conn = connection) => {
   return rows;
 };
 /**
- * [MỚI] (Admin) Lấy tất cả đơn hàng, kèm theo số lượng giao dịch
+ * [SỬA ĐỔI] (Admin) Lấy tất cả đơn hàng, kèm số lượng giao dịch VÀ TỔNG TIỀN ĐÃ TRẢ
  */
 const adminGetAllWithTxCount = async (conn = connection) => {
   const sql = `
     SELECT
       ro.*,
-      (SELECT COUNT(*) FROM PAYMENT p WHERE p.ORDER_ID = ro.ORDER_ID) AS transactionCount
+      
+      (SELECT COUNT(*) 
+       FROM PAYMENT p 
+       WHERE p.ORDER_ID = ro.ORDER_ID) AS transactionCount,
+       
+      (SELECT SUM(p.AMOUNT) 
+       FROM PAYMENT p 
+       WHERE p.ORDER_ID = ro.ORDER_ID AND p.STATUS = 'SUCCESS' AND p.AMOUNT > 0) AS totalPaid
+       
     FROM RENTAL_ORDER ro
     ORDER BY ro.CREATED_AT DESC
   `;
