@@ -96,10 +96,22 @@ const handleUpdateCar = async (req, res) => {
     return res.status(status).json({ error: err.message });
   }
 };
+const handleGetCarUser = async (req, res) => {
+  try {
+    // Gọi service mới, không cần truyền gì từ req
+    const cars = await carService.getCarUser();
+    return res.status(200).json(cars);
+  } catch (error) {
+    // Log lỗi
+    console.error(error);
+    return res.status(500).json({ error: "Internal Server Error" });
+  }
+};
 module.exports = {
   handleCreateCar,
   handleGetCarDetails,
   handleGetAllCars,
   handleDeleteCar,
   handleUpdateCar,
+  handleGetCarUser,
 };

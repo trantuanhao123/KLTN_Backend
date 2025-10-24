@@ -65,10 +65,20 @@ const updateExistingCar = async (carId, carData) => {
     throw new Error(`Could not update car ID ${id}: ${err.message}`);
   }
 };
+const getCarUser = async () => {
+  // Chúng ta gọi hàm model cũ, nhưng truyền filter cứng
+  // là { status: 'AVAILABLE' }.
+  // Hàm model getAllCarsUser sẽ xử lý filter này
+  // và BỎ QUA filter branchId (vì chúng ta không truyền)
+  const filters = { status: "AVAILABLE" };
+  return await carModel.getAllCarsUser(filters);
+};
+
 module.exports = {
   createNewCar,
   getCarDetails,
   getCarList,
   deleteExistingCar,
   updateExistingCar,
+  getCarUser,
 };

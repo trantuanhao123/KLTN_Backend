@@ -676,7 +676,7 @@ const adminGetOrderById = async (orderId) => {
       payments: payments, // Thêm danh sách giao dịch vào chi tiết
     };
   } catch (error) {
-    console.error("Lỗi khi lấy chi tiết đơn hàng (Service):", error);
+    console.error("Lỗi khi lấy chis tiết đơn hàng (Service):", error);
     throw new Error(error.message || "Lỗi hệ thống.");
   }
 };
