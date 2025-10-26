@@ -206,7 +206,15 @@ async function verifyUser(userId) {
   if (!affected) throw new Error("Không thể xác minh người dùng");
   return await UserModel.findById(userId);
 }
-
+// 🆕 Lấy danh sách user cho dropdown (Admin)
+async function getUsersForDropdown() {
+  const users = await UserModel.getForDropdown();
+  // Format lại theo yêu cầu "mã -- tên"
+  return users.map((user) => ({
+    value: user.USER_ID, // Mã (để form submit)
+    label: `${user.USER_ID} -- ${user.FULLNAME || user.EMAIL}`, // Tên (để hiển thị)
+  }));
+}
 module.exports = {
   register,
   verifyRegistration,
@@ -220,4 +228,5 @@ module.exports = {
   deleteUser,
   verifyUser,
   reActiveUser,
+  getUsersForDropdown,
 };

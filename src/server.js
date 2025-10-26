@@ -17,6 +17,7 @@ const bannerRouter = require("./routes/bannerRoutes");
 const rentalOrderRouter = require("./routes/rentalOrderRoutes");
 const paymentRouter = require("./routes/paymentRoutes");
 const discountRouter = require("./routes/discountRoutes");
+const notificationRouter = require("./routes/notificationRoutes");
 
 const app = express(); //app express
 const port = process.env.PORT || 8080; //port
@@ -44,6 +45,7 @@ app.use("/banner", bannerRouter);
 app.use("/order", rentalOrderRouter);
 app.use("/payment", paymentRouter);
 app.use("/discount", discountRouter);
+app.use("/notification", notificationRouter);
 
 console.log("⏰ Đã lên lịch cho Cron Job (quét đơn hết hạn) chạy mỗi phút.");
 

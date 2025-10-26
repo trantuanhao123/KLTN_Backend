@@ -50,12 +50,18 @@ async function resetPassword(userId, newPasswordHash) {
 async function getAll() {
   const [rows] = await connection.query(`
     SELECT 
-      USER_ID, EMAIL, PHONE, ROLE, VERIFIED, FULLNAME, BIRTHDATE,
-      AVATAR_URL, ADDRESS, ID_CARD, LICENSE_FRONT_URL, LICENSE_BACK_URL,
-      RATING, CREATED_AT, UPDATED_AT,IS_DELETED
-    FROM USERS
-    WHERE ROLE != 'ADMIN'
-    ORDER BY CREATED_AT DESC
+      u.USER_ID, u.EMAIL, u.PHONE, u.ROLE, u.VERIFIED, u.FULLNAME, u.BIRTHDATE,
+      u.AVATAR_URL, u.ADDRESS, u.ID_CARD, u.LICENSE_FRONT_URL, u.LICENSE_BACK_URL,
+      u.RATING, u.CREATED_AT, u.UPDATED_AT, u.IS_DELETED,
+      
+      -- ✅ [THÊM MỚI] Đếm số đơn hàng của mỗi user
+      (SELECT COUNT(*) 
+       FROM RENTAL_ORDER ro 
+       WHERE ro.USER_ID = u.USER_ID) AS orderCount
+       
+    FROM USERS u
+    WHERE u.ROLE != 'ADMIN'
+    ORDER BY u.CREATED_AT DESC
   `);
   return rows;
 }
@@ -187,6 +193,20 @@ async function findByRole(role, conn = connection) {
   );
   return rows[0];
 }
+// 🆕 Lấy danh sách user nhẹ cho dropdown (chỉ ID và tên/email)
+async function getForDropdown(conn = connection) {
+  const sql = `
+    SELECT 
+      USER_ID, 
+      FULLNAME, 
+      EMAIL 
+    FROM USERS 
+    WHERE ROLE != 'ADMIN' AND IS_DELETED = 0
+    ORDER BY FULLNAME
+  `;
+  const [rows] = await conn.query(sql);
+  return rows;
+}
 module.exports = {
   create,
   findByEmail,
@@ -202,4 +222,5 @@ module.exports = {
   updateUnverifiedUser,
   setEmailAsVerified,
   findByRole,
+  getForDropdown,
 };
