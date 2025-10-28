@@ -9,6 +9,19 @@ const payos = require("../config/payos");
 const { v4: uuidv4 } = require("uuid");
 
 /**
+ * (User) Lấy danh sách đơn hàng của chính mình
+ */
+const getLoginUserOrders = async (userId) => {
+  try {
+    // Hàm findByUserId đã tồn tại trong model
+    const orders = await rentalOrderModel.findByUserId(userId);
+    return orders;
+  } catch (error) {
+    console.error("Lỗi khi lấy đơn hàng cá nhân (Service):", error);
+    throw new Error("Lỗi hệ thống khi tải danh sách đơn hàng.");
+  }
+};
+/**
  * Tính toán giá thuê (Logic giả định)
  * Bạn cần thay thế bằng logic tính giá thực tế
  */
@@ -930,18 +943,24 @@ const adminUpdateOrder = async (orderId, updateData) => {
 const changeRentalDate = async (userId, orderId, newStartDate, newEndDate) => {
   let conn;
   try {
-    // 0. Validate input (cơ bản)
+    // 0. Validate input
     const newStart = new Date(newStartDate);
     const newEnd = new Date(newEndDate);
     const now = new Date();
 
     if (isNaN(newStart.getTime()) || isNaN(newEnd.getTime())) {
-      throw new Error("Ngày bắt đầu hoặc ngày kết thúc mới không hợp lệ.");
+      // LỖI 1: Ngày không hợp lệ
+      throw new Error(
+        "Ngày tháng bạn chọn không hợp lệ. Vui lòng kiểm tra lại."
+      );
     }
 
-    // 1. (Constraint 2) Đảm bảo không đổi sang thời gian quá khứ
+    // 1. (Constraint 2)
     if (newStart <= now) {
-      throw new Error("Ngày bắt đầu mới phải lớn hơn thời gian hiện tại.");
+      // LỖI 2: Đổi về quá khứ
+      throw new Error(
+        "Bạn không thể đổi lịch thuê về thời điểm trong quá khứ."
+      );
     }
 
     // 2. Bắt đầu Transaction
@@ -951,37 +970,40 @@ const changeRentalDate = async (userId, orderId, newStartDate, newEndDate) => {
     // 3. Lấy đơn hàng gốc
     const order = await rentalOrderModel.findById(orderId, conn);
     if (!order) {
-      throw new Error("Không tìm thấy đơn hàng.");
+      // LỖI 3: Không tìm thấy
+      throw new Error("Không tìm thấy đơn hàng này.");
     }
 
     // 4. Kiểm tra quyền sở hữu
     if (order.USER_ID !== userId) {
+      // LỖI 4: Không có quyền
       throw new Error("Bạn không có quyền thay đổi đơn hàng này.");
     }
 
-    // 5. Kiểm tra trạng thái đơn hàng (Chỉ cho đổi khi đã CONFIRMED)
+    // 5. Kiểm tra trạng thái đơn hàng
     if (order.STATUS !== "CONFIRMED") {
+      // LỖI 5: Sai trạng thái
       throw new Error(
-        "Chỉ có thể đổi ngày khi đơn hàng ở trạng thái 'CONFIRMED' (đã thanh toán và chưa nhận xe)."
+        "Bạn chỉ có thể đổi ngày cho các đơn hàng 'Đã xác nhận' và 'Chưa nhận xe'."
       );
     }
 
-    // 6. (Constraint 1) Kiểm tra thời lượng thuê (precision-safe)
+    // 6. (Constraint 1) Kiểm tra thời lượng
     const oldStart = new Date(order.START_DATE);
     const oldEnd = new Date(order.END_DATE);
 
-    // Lấy thời lượng (tính bằng mili-giây)
     const oldDurationMs = oldEnd.getTime() - oldStart.getTime();
     const newDurationMs = newEnd.getTime() - newStart.getTime();
 
     // So sánh (chính xác đến từng mili-giây)
     if (oldDurationMs !== newDurationMs) {
+      // LỖI 6: Sai thời lượng
       throw new Error(
-        `Thời lượng thuê phải được giữ nguyên. Thời lượng cũ: ${oldDurationMs}ms, thời lượng mới: ${newDurationMs}ms.`
+        "Thời lượng thuê mới phải bằng chính xác thời lượng thuê ban đầu."
       );
     }
 
-    // 7. BỎ QUA KIỂM TRA XUNG ĐỘT (THEO YÊU CẦU)
+    // 7. BỎ QUA KIỂM TRA XUNG ĐỘT
 
     // 8. Cập nhật đơn hàng
     const updates = {
@@ -1006,29 +1028,33 @@ const changeRentalDate = async (userId, orderId, newStartDate, newEndDate) => {
   } catch (error) {
     if (conn) await conn.rollback();
     console.error("Lỗi khi đổi ngày thuê (Service):", error);
+
     // Phân loại lỗi để trả về status code phù hợp ở Controller
+    // Lỗi 404/403
     if (
-      error.message.includes("Không tìm thấy") ||
-      error.message.includes("không có quyền")
+      error.message.includes("Không tìm thấy") || // Lỗi 3
+      error.message.includes("không có quyền") // Lỗi 4
     ) {
-      // 404/403
       throw new Error(error.message);
     }
+    // Lỗi 400
     if (
-      error.message.includes("phải lớn hơn") ||
-      error.message.includes("Thời lượng thuê") ||
-      error.message.includes("không hợp lệ") ||
-      error.message.includes("Chỉ có thể đổi")
+      error.message.includes("quá khứ") || // Lỗi 2
+      error.message.includes("Thời lượng thuê") || // Lỗi 6
+      error.message.includes("không hợp lệ") || // Lỗi 1
+      error.message.includes("Chỉ có thể đổi ngày") // Lỗi 5
     ) {
-      // 400 Bad Request
       throw new Error(error.message);
     }
+
+    // Lỗi 500
     throw new Error(error.message || "Lỗi hệ thống khi đổi ngày thuê.");
   } finally {
     if (conn) conn.release();
   }
 };
 module.exports = {
+  getLoginUserOrders,
   createOrder,
   cancelPendingOrder,
   processExpiredOrders,

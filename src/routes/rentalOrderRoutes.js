@@ -8,7 +8,11 @@ const router = express.Router();
 
 // === User Routes ===
 // Yêu cầu: Đã đăng nhập (authMiddleware)
-
+router.get(
+  "/login-orders",
+  authMiddleware,
+  orderController.handleGetLoginUserOrders
+);
 // Bước 2: Tạo đơn hàng
 router.post("/", authMiddleware, orderController.handleCreateOrder);
 

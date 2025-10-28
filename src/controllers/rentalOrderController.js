@@ -1,5 +1,22 @@
 const rentalOrderService = require("../services/rentalOrderService");
 
+/**
+ * [MỚI] (User) Lấy danh sách đơn hàng của chính mình
+ */
+const handleGetLoginUserOrders = async (req, res) => {
+  try {
+    // Lấy userId từ JWT (đã qua authMiddleware)
+    const userId = req.user.USER_ID;
+
+    const orders = await rentalOrderService.getLoginUserOrders(userId);
+
+    return res.status(200).json(orders);
+  } catch (error) {
+    return res
+      .status(500)
+      .json({ error: error.message || "Lỗi hệ thống, vui lòng thử lại sau." });
+  }
+};
 // POST /api/orders (Bước 2)
 const handleCreateOrder = async (req, res) => {
   try {
@@ -327,26 +344,31 @@ const handleChangeRentalDate = async (req, res) => {
   } catch (error) {
     // 400 Bad Request (Lỗi do người dùng nhập sai)
     if (
-      error.message.includes("phải lớn hơn") ||
-      error.message.includes("Thời lượng thuê") ||
-      error.message.includes("không hợp lệ") ||
-      error.message.includes("Chỉ có thể đổi")
+      error.message.includes("quá khứ") || // "Bạn không thể đổi lịch thuê về thời điểm trong quá khứ."
+      error.message.includes("Thời lượng thuê") || // "Thời lượng thuê mới phải bằng..."
+      error.message.includes("không hợp lệ") || // "Ngày tháng bạn chọn không hợp lệ."
+      error.message.includes("Chỉ có thể đổi ngày") // "Bạn chỉ có thể đổi ngày cho các đơn hàng..."
     ) {
       return res.status(400).json({ error: error.message });
     }
+
     // 404/403 (Không tìm thấy hoặc không có quyền)
     if (
-      error.message.includes("Không tìm thấy") ||
-      error.message.includes("không có quyền")
+      error.message.includes("Không tìm thấy") || // "Không tìm thấy đơn hàng này."
+      error.message.includes("không có quyền") // "Bạn không có quyền thay đổi đơn hàng này."
     ) {
       return res.status(404).json({ error: error.message });
     }
 
     // 500 Lỗi chung
-    return res.status(500).json({ error: error.message });
+    return res
+      .status(500)
+      .json({ error: "Lỗi hệ thống, vui lòng thử lại sau." });
   }
 };
+
 module.exports = {
+  handleGetLoginUserOrders,
   handleCreateOrder,
   handleCancelPendingOrder,
   handleCronJob,
