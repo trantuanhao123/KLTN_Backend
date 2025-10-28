@@ -3,17 +3,14 @@ const router = express.Router();
 const userController = require("../controllers/userController");
 const authMiddleware = require("../middlewares/authMiddleware");
 const requireAdmin = require("../middlewares/requireAdmin");
-const {
-  uploadCarImages,
-  uploadAvatar,
-  uploadLicense,
-} = require("../config/multer");
+const { uploadAvatar, uploadLicense } = require("../config/multer");
 
 router.post("/register", userController.register);
 router.post("/verify-register", userController.verifyRegistration);
 router.post("/login", userController.login);
 router.post("/loginAdmin", userController.loginAdmin);
 router.get("/profile", authMiddleware, userController.profile);
+router.post("/change-password", authMiddleware, userController.changePassword);
 
 //Update Profile
 router.put("/editProfile/:id", userController.updateProfile);

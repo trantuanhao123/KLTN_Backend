@@ -215,6 +215,24 @@ async function getUsersForDropdown() {
     label: `${user.USER_ID} -- ${user.FULLNAME || user.EMAIL}`, // Tên (để hiển thị)
   }));
 }
+
+async function changePassword(userId, oldPassword, newPassword) {
+  const user = await UserModel.findById(userId);
+  if (!user) throw new Error("Không tìm thấy người dùng");
+
+  // So sánh mật khẩu cũ
+  const valid = await bcrypt.compare(oldPassword, user.PASSWORD_HASH);
+  if (!valid) throw new Error("Mật khẩu cũ không đúng");
+
+  // Hash mật khẩu mới
+  const newPasswordHash = await bcrypt.hash(newPassword, 10);
+
+  // Cập nhật mật khẩu mới
+  const affectedRows = await UserModel.resetPassword(userId, newPasswordHash);
+  if (affectedRows === 0) throw new Error("Đổi mật khẩu thất bại");
+
+  return { message: "Đổi mật khẩu thành công" };
+}
 module.exports = {
   register,
   verifyRegistration,
@@ -229,4 +247,5 @@ module.exports = {
   verifyUser,
   reActiveUser,
   getUsersForDropdown,
+  changePassword,
 };

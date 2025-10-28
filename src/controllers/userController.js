@@ -216,7 +216,28 @@ async function verifyUser(req, res) {
     res.status(400).json({ error: error.message });
   }
 }
+async function changePassword(req, res) {
+  try {
+    const userId = req.user.USER_ID; // Lấy từ JWT (authMiddleware)
+    const { oldPassword, newPassword } = req.body;
 
+    if (!oldPassword || !newPassword) {
+      return res
+        .status(400)
+        .json({ error: "Vui lòng nhập đầy đủ mật khẩu cũ và mới." });
+    }
+
+    const result = await UserService.changePassword(
+      userId,
+      oldPassword,
+      newPassword
+    );
+
+    res.json(result);
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+}
 module.exports = {
   register,
   verifyRegistration,
@@ -231,4 +252,5 @@ module.exports = {
   deleteUser,
   verifyUser,
   reActiveUser,
+  changePassword,
 };
