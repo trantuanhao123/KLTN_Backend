@@ -62,8 +62,36 @@ const handleAdminConfirmRefund = async (req, res) => {
     return res.status(500).json({ error: error.message });
   }
 };
+const checkOrderStatus = async (req, res) => {
+  try {
+    const { orderId } = req.params;
+
+    // Chuyển đổi orderId từ string (URL) sang số (nếu CSDL của bạn dùng số)
+    // Nếu CSDL của bạn dùng ORDER_ID là số, hãy dùng dòng này
+    const numericOrderId = parseInt(orderId);
+    if (isNaN(numericOrderId)) {
+      return res.status(400).json({ error: "ORDER_ID không hợp lệ." });
+    }
+
+    // Nếu CSDL của bạn dùng ORDER_ID là string, hãy dùng dòng này
+    // const numericOrderId = orderId;
+
+    if (!numericOrderId) {
+      return res.status(400).json({ error: "Thiếu ORDER_ID." });
+    }
+
+    const status = await paymentService.getOrderStatus(numericOrderId);
+    return res.status(200).json(status);
+  } catch (error) {
+    if (error.message.includes("Không tìm thấy")) {
+      return res.status(404).json({ error: error.message });
+    }
+    return res.status(500).json({ error: error.message });
+  }
+};
 module.exports = {
   handlePayOSWebhook,
   handleAdminGetPendingRefunds,
   handleAdminConfirmRefund,
+  checkOrderStatus,
 };

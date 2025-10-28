@@ -166,8 +166,27 @@ const adminConfirmRefund = async (paymentId, adminId) => {
     if (conn) conn.release();
   }
 };
+const getOrderStatus = async (orderId) => {
+  try {
+    // Rất quan trọng: Chỉ lấy các trường cần thiết, không lộ
+    // thông tin nhạy cảm của đơn hàng.
+    const order = await rentalOrderModel.findById(orderId);
+
+    if (!order) {
+      throw new Error("Không tìm thấy đơn hàng.");
+    }
+    return {
+      status: order.STATUS,
+      paymentStatus: order.PAYMENT_STATUS,
+    };
+  } catch (error) {
+    console.error("Lỗi khi lấy trạng thái đơn hàng (Service):", error);
+    throw new Error(error.message || "Lỗi hệ thống.");
+  }
+};
 module.exports = {
   handlePayOSWebhook,
   adminGetPendingRefunds,
   adminConfirmRefund,
+  getOrderStatus,
 };

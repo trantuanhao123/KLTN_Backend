@@ -21,4 +21,5 @@ router.patch(
   requireAdmin,
   paymentController.handleAdminConfirmRefund
 );
+router.get("/order-status/:orderId", paymentController.checkOrderStatus);
 module.exports = router;
