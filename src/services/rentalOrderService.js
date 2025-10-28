@@ -924,13 +924,117 @@ const adminUpdateOrder = async (orderId, updateData) => {
     if (conn) conn.release();
   }
 };
+/**
+ * [MỚI] (User) Thay đổi ngày thuê (KHÔNG KIỂM TRA XUNG ĐỘT)
+ */
+const changeRentalDate = async (userId, orderId, newStartDate, newEndDate) => {
+  let conn;
+  try {
+    // 0. Validate input (cơ bản)
+    const newStart = new Date(newStartDate);
+    const newEnd = new Date(newEndDate);
+    const now = new Date();
 
+    if (isNaN(newStart.getTime()) || isNaN(newEnd.getTime())) {
+      throw new Error("Ngày bắt đầu hoặc ngày kết thúc mới không hợp lệ.");
+    }
+
+    // 1. (Constraint 2) Đảm bảo không đổi sang thời gian quá khứ
+    if (newStart <= now) {
+      throw new Error("Ngày bắt đầu mới phải lớn hơn thời gian hiện tại.");
+    }
+
+    // 2. Bắt đầu Transaction
+    conn = await connection.getConnection();
+    await conn.beginTransaction();
+
+    // 3. Lấy đơn hàng gốc
+    const order = await rentalOrderModel.findById(orderId, conn);
+    if (!order) {
+      throw new Error("Không tìm thấy đơn hàng.");
+    }
+
+    // 4. Kiểm tra quyền sở hữu
+    if (order.USER_ID !== userId) {
+      throw new Error("Bạn không có quyền thay đổi đơn hàng này.");
+    }
+
+    // 5. Kiểm tra trạng thái đơn hàng (Chỉ cho đổi khi đã CONFIRMED)
+    if (order.STATUS !== "CONFIRMED") {
+      throw new Error(
+        "Chỉ có thể đổi ngày khi đơn hàng ở trạng thái 'CONFIRMED' (đã thanh toán và chưa nhận xe)."
+      );
+    }
+
+    // 6. (Constraint 1) Kiểm tra thời lượng thuê (precision-safe)
+    const oldStart = new Date(order.START_DATE);
+    const oldEnd = new Date(order.END_DATE);
+
+    // Lấy thời lượng (tính bằng mili-giây)
+    const oldDurationMs = oldEnd.getTime() - oldStart.getTime();
+    const newDurationMs = newEnd.getTime() - newStart.getTime();
+
+    // So sánh (chính xác đến từng mili-giây)
+    if (oldDurationMs !== newDurationMs) {
+      throw new Error(
+        `Thời lượng thuê phải được giữ nguyên. Thời lượng cũ: ${oldDurationMs}ms, thời lượng mới: ${newDurationMs}ms.`
+      );
+    }
+
+    // 7. BỎ QUA KIỂM TRA XUNG ĐỘT (THEO YÊU CẦU)
+
+    // 8. Cập nhật đơn hàng
+    const updates = {
+      START_DATE: newStartDate,
+      END_DATE: newEndDate,
+    };
+    await rentalOrderModel.update(orderId, updates, conn);
+
+    // 9. (Nên có) Gửi thông báo cho user
+    await notificationModel.create(
+      {
+        USER_ID: userId,
+        TITLE: `Đơn hàng ${order.ORDER_CODE} đã được cập nhật`,
+        CONTENT: `Lịch thuê xe của bạn đã được đổi thành công sang: ${newStartDate} - ${newEndDate}.`,
+      },
+      conn
+    );
+
+    // 10. Commit
+    await conn.commit();
+    return { message: "Cập nhật lịch thuê thành công." };
+  } catch (error) {
+    if (conn) await conn.rollback();
+    console.error("Lỗi khi đổi ngày thuê (Service):", error);
+    // Phân loại lỗi để trả về status code phù hợp ở Controller
+    if (
+      error.message.includes("Không tìm thấy") ||
+      error.message.includes("không có quyền")
+    ) {
+      // 404/403
+      throw new Error(error.message);
+    }
+    if (
+      error.message.includes("phải lớn hơn") ||
+      error.message.includes("Thời lượng thuê") ||
+      error.message.includes("không hợp lệ") ||
+      error.message.includes("Chỉ có thể đổi")
+    ) {
+      // 400 Bad Request
+      throw new Error(error.message);
+    }
+    throw new Error(error.message || "Lỗi hệ thống khi đổi ngày thuê.");
+  } finally {
+    if (conn) conn.release();
+  }
+};
 module.exports = {
   createOrder,
   cancelPendingOrder,
   processExpiredOrders,
   confirmOrderPickup,
   completeOrder,
+  changeRentalDate,
   cancelDepositedOrder,
   cancelPaidOrder,
   adminGetAllOrders,

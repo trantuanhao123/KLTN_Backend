@@ -104,5 +104,10 @@ router.patch(
 
 // Bước 3, TH2: Cron job
 router.post("/webhook/cron", orderController.handleCronJob);
-
+// User đổi ngày thuê
+router.patch(
+  "/change-date/:id",
+  authMiddleware,
+  orderController.handleChangeRentalDate
+);
 module.exports = router;

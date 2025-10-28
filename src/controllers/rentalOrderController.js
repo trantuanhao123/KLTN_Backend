@@ -304,6 +304,48 @@ const handleAdminUpdateOrder = async (req, res) => {
     return res.status(500).json({ error: error.message });
   }
 };
+const handleChangeRentalDate = async (req, res) => {
+  try {
+    const userId = req.user.USER_ID;
+    const orderId = parseInt(req.params.id);
+    const { newStartDate, newEndDate } = req.body;
+
+    if (!newStartDate || !newEndDate) {
+      return res
+        .status(400)
+        .json({ error: "Vui lòng cung cấp ngày bắt đầu và kết thúc mới." });
+    }
+
+    const result = await rentalOrderService.changeRentalDate(
+      userId,
+      orderId,
+      newStartDate,
+      newEndDate
+    );
+
+    return res.status(200).json(result);
+  } catch (error) {
+    // 400 Bad Request (Lỗi do người dùng nhập sai)
+    if (
+      error.message.includes("phải lớn hơn") ||
+      error.message.includes("Thời lượng thuê") ||
+      error.message.includes("không hợp lệ") ||
+      error.message.includes("Chỉ có thể đổi")
+    ) {
+      return res.status(400).json({ error: error.message });
+    }
+    // 404/403 (Không tìm thấy hoặc không có quyền)
+    if (
+      error.message.includes("Không tìm thấy") ||
+      error.message.includes("không có quyền")
+    ) {
+      return res.status(404).json({ error: error.message });
+    }
+
+    // 500 Lỗi chung
+    return res.status(500).json({ error: error.message });
+  }
+};
 module.exports = {
   handleCreateOrder,
   handleCancelPendingOrder,
@@ -318,4 +360,5 @@ module.exports = {
   handleAdminGetUserOrders,
   handleAdminCreateManualOrder,
   handleAdminUpdateOrder,
+  handleChangeRentalDate,
 };

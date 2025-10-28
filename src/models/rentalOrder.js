@@ -121,6 +121,7 @@ const findByUserId = async (userId, conn = connection) => {
   );
   return rows;
 };
+
 module.exports = {
   create,
   findById,
