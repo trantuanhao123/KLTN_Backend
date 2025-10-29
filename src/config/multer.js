@@ -61,9 +61,41 @@ const uploadBannerImage = multer({
   limits: { fileSize: 1024 * 1024 * 5 }, // Giới hạn 5MB
 }).single("banner_url");
 
+// Cấu hình lưu trữ cho SỰ CỐ (trong public/incidents)
+const incidentStorage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    // Lưu file sự cố vào thư mục riêng
+    cb(null, path.join(__dirname, "..", "public", "incidents"));
+  },
+  filename: (req, file, cb) => {
+    const fileExtension = path.extname(file.originalname);
+    const uniqueFilename = `incident-${Date.now()}-${generateRandomString()}${fileExtension}`;
+    cb(null, uniqueFilename);
+  },
+});
+// Lọc file: Cho phép ảnh, video và tài liệu
+const incidentFileFilter = (req, file, cb) => {
+  if (
+    file.mimetype.startsWith("image/") ||
+    file.mimetype.startsWith("video/") ||
+    file.mimetype.startsWith("application/pdf") // Thêm các loại file khác nếu cần
+  ) {
+    cb(null, true);
+  } else {
+    cb(new Error("Loại file không được hỗ trợ!"), false);
+  }
+};
+
+// Upload media cho sự cố (ảnh + video, tối đa 10 file)
+const uploadIncidentMedia = multer({
+  storage: incidentStorage,
+  fileFilter: incidentFileFilter,
+  limits: { fileSize: 1024 * 1024 * 25 }, // Giới hạn 25MB (vì có video)
+}).array("media", 10); // 'media' là tên field trong form-data
 module.exports = {
   uploadAvatar,
   uploadCarImages,
   uploadLicense,
   uploadBannerImage,
+  uploadIncidentMedia,
 };

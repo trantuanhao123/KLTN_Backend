@@ -1,5 +1,4 @@
 const { connection } = require("../config/database");
-const payos = require("../config/payos");
 const rentalOrderModel = require("../models/rentalOrder");
 const paymentModel = require("../models/payment");
 const notificationModel = require("../models/notification");
