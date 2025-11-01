@@ -167,7 +167,18 @@ const createOrder = async (
     const { orderId } = await rentalOrderModel.create(orderData, conn);
 
     // 5.2. UPDATE CAR STATUS = 'RESERVED'
-    await carModel.updateCarStatus(carId, "RESERVED", conn);
+    const oldStatus = car.STATUS;
+    const newStatus = "RESERVED";
+    await carModel.updateCarStatus(carId, newStatus, conn);
+
+    // [THÊM] 5.3. GHI LOG
+    await carModel.logStatusChange(
+      carId,
+      oldStatus, // "AVAILABLE"
+      newStatus,
+      `Đặt chỗ cho đơn hàng ${orderCode}`,
+      conn
+    );
 
     // 6. Tạo link thanh toán PayOS
     let amountToPay = finalAmount; // Mặc định là trả 100%
@@ -229,6 +240,14 @@ const cancelPendingOrder = async (userId, orderId) => {
     // 2. UPDATE CAR
     await carModel.updateCarStatus(order.CAR_ID, "AVAILABLE", conn);
 
+    // 3. GHI LOG
+    await carModel.logStatusChange(
+      order.CAR_ID,
+      "RESERVED", // Logic: PENDING_PAYMENT order luôn giữ xe "RESERVED"
+      newStatus,
+      `Hủy đơn PENDING_PAYMENT ${order.ORDER_CODE}`,
+      conn
+    );
     await conn.commit();
     return { message: "Hủy đơn hàng thành công." };
   } catch (error) {
@@ -276,7 +295,14 @@ const processExpiredOrders = async () => {
 
         // 2. UPDATE CAR
         await carModel.updateCarStatus(order.CAR_ID, "AVAILABLE", orderConn);
-
+        // 3. GHI LOG
+        await carModel.logStatusChange(
+          order.CAR_ID,
+          "RESERVED", // Logic: PENDING_PAYMENT order hết hạn
+          newStatus,
+          `Hệ thống tự hủy đơn hết hạn ${order.ORDER_ID}`,
+          orderConn
+        );
         await orderConn.commit();
         console.log(`CRON: Đã hủy đơn ${order.ORDER_ID}`);
       } catch (err) {
@@ -343,7 +369,6 @@ const confirmOrderPickup = async (orderId, adminId, cashPaymentData) => {
           );
         }
       }
-      // --- [CẢI TIẾN KẾT THÚC] ---
 
       // 5. Ghi nhận giao dịch (nếu đã qua bước kiểm tra)
       await paymentModel.create(
@@ -363,8 +388,15 @@ const confirmOrderPickup = async (orderId, adminId, cashPaymentData) => {
     // TH2: Đã PAID (trả 100%), bỏ qua
 
     await rentalOrderModel.update(orderId, updates, conn);
-    await carModel.updateCarStatus(order.CAR_ID, "RENTED", conn);
-
+    const newStatus = "RENTED";
+    await carModel.updateCarStatus(order.CAR_ID, newStatus, conn);
+    await carModel.logStatusChange(
+      order.CAR_ID,
+      "RESERVED", // Logic: Đơn "CONFIRMED" (trạng thái trước đó) là xe "RESERVED"
+      newStatus,
+      `Bàn giao xe cho đơn hàng ${order.ORDER_CODE}`,
+      conn
+    );
     await conn.commit();
     return { message: "Xác nhận bàn giao xe thành công." };
   } catch (error) {
@@ -426,8 +458,16 @@ const completeOrder = async (
     await rentalOrderModel.update(orderId, orderUpdates, conn);
 
     // Cập nhật xe
-    await carModel.updateCarStatus(order.CAR_ID, carReturnStatus, conn);
+    const newStatus = carReturnStatus;
+    await carModel.updateCarStatus(order.CAR_ID, newStatus, conn);
 
+    await carModel.logStatusChange(
+      order.CAR_ID,
+      "RENTED", // Logic: Đơn "IN_PROGRESS" (trạng thái trước đó) là xe "RENTED"
+      newStatus,
+      `Hoàn tất, trả xe từ đơn hàng ${order.ORDER_CODE}`,
+      conn
+    );
     await conn.commit();
     return { message: "Hoàn tất đơn hàng thành công." };
   } catch (error) {
@@ -471,9 +511,18 @@ const cancelDepositedOrder = async (userId, orderId) => {
     await rentalOrderModel.update(orderId, orderUpdates, conn);
 
     // 2. Cập nhật CAR
-    await carModel.updateCarStatus(order.CAR_ID, "AVAILABLE", conn);
+    const newStatus = "AVAILABLE";
+    await carModel.updateCarStatus(order.CAR_ID, newStatus, conn);
 
-    // 3. (MỚI) Tạo thông báo cho user
+    // 3. GHI LOG
+    await carModel.logStatusChange(
+      order.CAR_ID,
+      "RESERVED", // Logic: Đơn "CONFIRMED" (trạng thái trước đó)
+      newStatus,
+      `Hủy đơn (mất cọc) ${order.ORDER_CODE}`,
+      conn
+    );
+    // 4. Tạo thông báo cho user
     await notificationModel.create(
       {
         USER_ID: order.USER_ID,
@@ -559,11 +608,20 @@ const cancelPaidOrder = async (userId, orderId, refundInfo) => {
 
     // 1. Cập nhật RENTAL_ORDER và CAR
     await rentalOrderModel.update(orderId, orderUpdates, conn);
-    await carModel.updateCarStatus(order.CAR_ID, "AVAILABLE", conn);
 
-    // 2. (Bỏ qua PayOS API refund tự động)
+    const newStatus = "AVAILABLE";
+    await carModel.updateCarStatus(order.CAR_ID, newStatus, conn);
 
-    // 3. Ghi nhận giao dịch REFUND (Chờ xử lý)
+    // [THÊM] GHI LOG
+    await carModel.logStatusChange(
+      order.CAR_ID,
+      "RESERVED", // Logic: Đơn "CONFIRMED" (trạng thái trước đó)
+      newStatus,
+      `Hủy đơn (hoàn tiền) ${order.ORDER_CODE}`,
+      conn
+    );
+
+    // 2. Ghi nhận giao dịch REFUND (Chờ xử lý)
     if (refundAmount > 0) {
       await paymentModel.create(
         {
@@ -709,10 +767,32 @@ const adminHardDeleteOrder = async (orderId, adminId) => {
       throw new Error("Không tìm thấy đơn hàng để xóa.");
     }
 
-    // 2. Cập nhật trạng thái xe lại thành 'AVAILABLE'
-    await carModel.updateCarStatus(order.CAR_ID, "AVAILABLE", conn);
+    // 2. Xác định trạng thái cũ của xe dựa trên trạng thái đơn
+    let oldCarStatus;
+    if (order.STATUS === "IN_PROGRESS") {
+      oldCarStatus = "RENTED";
+    } else if (
+      order.STATUS === "CONFIRMED" ||
+      order.STATUS === "PENDING_PAYMENT"
+    ) {
+      oldCarStatus = "RESERVED";
+    } else {
+      // (COMPLETED, CANCELLED)
+      oldCarStatus = "AVAILABLE";
+    }
+    const newStatus = "AVAILABLE";
 
-    // 3. Tạo thông báo cho người dùng
+    // Cập nhật trạng thái xe lại thành 'AVAILABLE'
+    await carModel.updateCarStatus(order.CAR_ID, newStatus, conn);
+    // 3. GHI LOG
+    await carModel.logStatusChange(
+      order.CAR_ID,
+      oldCarStatus,
+      newStatus,
+      `Admin xóa cứng đơn hàng ${order.ORDER_CODE} (trạng thái cũ: ${oldCarStatus})`,
+      conn
+    );
+    // 4. Tạo thông báo cho người dùng
     await notificationModel.create(
       {
         USER_ID: order.USER_ID,
@@ -812,9 +892,18 @@ const adminCreateManualOrder = async (adminId, orderDetails) => {
     const { orderId } = await rentalOrderModel.create(orderData, conn);
 
     // 5. UPDATE CAR STATUS = 'RESERVED'
-    await carModel.updateCarStatus(carId, "RESERVED", conn);
-
-    // 6. Ghi nhận thanh toán (nếu có)
+    const oldStatus = car.STATUS; // Lấy từ 'car' đã fetch ở đầu
+    const newStatus = "RESERVED";
+    await carModel.updateCarStatus(carId, newStatus, conn);
+    // 6. GHI LOG
+    await carModel.logStatusChange(
+      carId,
+      oldStatus, // "AVAILABLE"
+      newStatus,
+      `Admin tạo đơn thủ công ${orderCode}`,
+      conn
+    );
+    // 7. Ghi nhận thanh toán (nếu có)
     if (
       paymentMethod === "CASH" &&
       (paymentStatus === "PAID" || paymentStatus === "PARTIAL")
@@ -832,7 +921,7 @@ const adminCreateManualOrder = async (adminId, orderDetails) => {
       );
     }
 
-    // 7. Gửi thông báo cho user
+    // 8. Gửi thông báo cho user
     await notificationModel.create(
       {
         USER_ID: userId,
@@ -887,9 +976,30 @@ const adminUpdateOrder = async (orderId, updateData) => {
         throw new Error("Xe mới được chọn không khả dụng.");
       }
       // Cập nhật xe mới
-      await carModel.updateCarStatus(newCarId, "RESERVED", conn);
+      const newCarOldStatus = newCar.STATUS; // "AVAILABLE"
+      const newCarNewStatus = "RESERVED";
+      await carModel.updateCarStatus(newCarId, newCarNewStatus, conn);
+      // [THÊM] GHI LOG (XE MỚI)
+      await carModel.logStatusChange(
+        newCarId,
+        newCarOldStatus,
+        newCarNewStatus,
+        `Admin đổi xe (nhận xe mới) cho đơn ${order.ORDER_CODE}`,
+        conn
+      );
       // Trả xe cũ
-      await carModel.updateCarStatus(order.CAR_ID, "AVAILABLE", conn);
+      const oldCarOldStatus = "RESERVED"; // Logic: Đơn "CONFIRMED"
+      const oldCarNewStatus = "AVAILABLE";
+      await carModel.updateCarStatus(order.CAR_ID, oldCarNewStatus, conn);
+
+      // [THÊM] GHI LOG (XE CŨ)
+      await carModel.logStatusChange(
+        order.CAR_ID,
+        oldCarOldStatus,
+        oldCarNewStatus,
+        `Admin đổi xe (trả xe cũ) cho đơn ${order.ORDER_CODE}`,
+        conn
+      );
     }
 
     // 2. Nếu đổi xe hoặc đổi ngày -> Tính lại giá

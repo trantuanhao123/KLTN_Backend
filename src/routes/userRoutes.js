@@ -13,13 +13,23 @@ router.get("/profile", authMiddleware, userController.profile);
 router.post("/change-password", authMiddleware, userController.changePassword);
 
 //Update Profile
-router.put("/editProfile/:id", userController.updateProfile);
+router.put("/editProfile/:id", authMiddleware, userController.updateProfile);
 
 // Route cập nhật avatar (dữ liệu multipart/form-data, 1 file)
-router.post("/editAvatar/:id", uploadAvatar, userController.uploadAvatar);
+router.post(
+  "/editAvatar/:id",
+  authMiddleware,
+  uploadAvatar,
+  userController.uploadAvatar
+);
 
 // Route cập nhật bằng lái xe (dữ liệu multipart/form-data, 2 files)
-router.post("/editLicense/:id", uploadLicense, userController.uploadLicense);
+router.post(
+  "/editLicense/:id",
+  authMiddleware,
+  uploadLicense,
+  userController.uploadLicense
+);
 
 // Admin-only CRUD
 router.get("/", authMiddleware, requireAdmin, userController.getAllUsers);

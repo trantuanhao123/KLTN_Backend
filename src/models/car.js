@@ -133,11 +133,28 @@ const getCarById = async (carId) => {
     [carId]
   );
 
+  // 🔹 [THÊM] Lấy lịch sử trạng thái
+  const [history] = await connection.execute(
+    `
+    SELECT 
+      HISTORY_ID,
+      OLD_STATUS,
+      NEW_STATUS,
+      NOTE,
+      CREATED_AT
+    FROM CAR_STATUS_HISTORY
+    WHERE CAR_ID = ?
+    ORDER BY CREATED_AT DESC
+    `,
+    [carId]
+  );
+
   // 🔹 Gộp kết quả và trả về
   return {
     ...car[0],
     images,
     services,
+    history, // [THÊM]
   };
 };
 
@@ -189,12 +206,46 @@ const getAllCarsUser = async (filters = {}) => {
   return rows;
 };
 const deleteCar = async (carId) => {
-  const [result] = await connection.execute(
-    "UPDATE CAR SET STATUS = 'DELETED' WHERE CAR_ID = ?",
-    [carId]
-  );
-  return result.affectedRows;
+  // [SỬA ĐỔI] Chuyển sang transaction để lấy status cũ và ghi log
+  let conn = null;
+  try {
+    conn = await connection.getConnection();
+    await conn.beginTransaction();
+
+    // 1. Lấy trạng thái cũ
+    const [rows] = await conn.execute(
+      "SELECT STATUS FROM CAR WHERE CAR_ID = ? FOR UPDATE",
+      [carId]
+    );
+    if (rows.length === 0) throw new Error(`Car ID ${carId} not found.`);
+    const oldStatus = rows[0].STATUS;
+    const newStatus = "DELETED";
+
+    // 2. Cập nhật
+    const [result] = await conn.execute(
+      "UPDATE CAR SET STATUS = ? WHERE CAR_ID = ?",
+      [newStatus, carId]
+    );
+
+    // 3. Ghi log
+    await logStatusChange(
+      carId,
+      oldStatus,
+      newStatus,
+      "Admin xóa mềm xe (soft delete)",
+      conn
+    );
+
+    await conn.commit();
+    return result.affectedRows;
+  } catch (error) {
+    if (conn) await conn.rollback();
+    throw error;
+  } finally {
+    if (conn) conn.release();
+  }
 };
+
 const updateCarStatus = async (carId, status, conn = connection) => {
   // if conn is pool, it will execute; if it's a transaction connection, it's fine too
   const sql = `UPDATE CAR SET STATUS = ? WHERE CAR_ID = ?`;
@@ -207,7 +258,16 @@ const updateCar = async (carId, carData, serviceIds) => {
     conn = await connection.getConnection();
     await conn.beginTransaction();
 
-    // 1️⃣ Cập nhật thông tin cơ bản
+    // [THÊM] Lấy trạng thái cũ
+    const [rows] = await conn.execute(
+      "SELECT STATUS FROM CAR WHERE CAR_ID = ? FOR UPDATE",
+      [carId]
+    );
+    if (rows.length === 0) throw new Error(`Car ID ${carId} not found.`);
+    const oldStatus = rows[0].STATUS;
+    const newStatus = carData.status; // Lấy trạng thái mới từ input
+
+    // 1️⃣ Cập nhật thông tin cơ bản (như cũ)
     await conn.execute(
       `
       UPDATE CAR
@@ -236,7 +296,7 @@ const updateCar = async (carId, carData, serviceIds) => {
         carData.color,
         carData.transmission,
         carData.fuelType,
-        carData.status,
+        carData.status, // newStatus
         carData.pricePerHour,
         carData.pricePerDay,
         carData.branchId,
@@ -247,7 +307,18 @@ const updateCar = async (carId, carData, serviceIds) => {
       ]
     );
 
-    // 2️⃣ Xóa toàn bộ dịch vụ cũ
+    // [THÊM] Ghi log nếu trạng thái thay đổi
+    if (oldStatus !== newStatus) {
+      await logStatusChange(
+        carId,
+        oldStatus,
+        newStatus,
+        "Admin cập nhật thông tin xe",
+        conn
+      );
+    }
+
+    // 2️⃣ Xóa toàn bộ dịch vụ cũ (như cũ)
     await conn.execute(`DELETE FROM CAR_SERVICE WHERE CAR_ID = ?`, [carId]);
 
     // 3️⃣ Thêm dịch vụ mới (nếu có)
@@ -269,7 +340,42 @@ const updateCar = async (carId, carData, serviceIds) => {
     if (conn) conn.release();
   }
 };
+/**
+ * Hàm ghi log thay đổi trạng thái
+ */
+const logStatusChange = async (
+  carId,
+  oldStatus,
+  newStatus,
+  note,
+  conn = connection
+) => {
+  // Bỏ qua nếu trạng thái không đổi
+  if (oldStatus === newStatus) {
+    return;
+  }
 
+  try {
+    const sql = `
+      INSERT INTO CAR_STATUS_HISTORY 
+        (CAR_ID, OLD_STATUS, NEW_STATUS, NOTE) 
+      VALUES (?, ?, ?, ?)
+    `;
+    await conn.execute(sql, [
+      carId,
+      oldStatus,
+      newStatus,
+      note || "Cập nhật trạng thái.",
+    ]);
+  } catch (error) {
+    // Không nên để lỗi ghi log làm hỏng transaction chính
+    // Nếu muốn bắt buộc log, hãy bỏ try...catch
+    console.error(
+      `LỖI GHI LOG (Bỏ qua): Không thể ghi lịch sử cho CAR_ID ${carId}`,
+      error
+    );
+  }
+};
 module.exports = {
   createCar,
   getCarById,
@@ -278,4 +384,5 @@ module.exports = {
   updateCar,
   getAllCarsUser,
   updateCarStatus,
+  logStatusChange,
 };
