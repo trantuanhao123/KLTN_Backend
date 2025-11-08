@@ -416,6 +416,7 @@ const completeOrder = async (
   adminId,
   extraFee,
   note,
+  rating,
   carReturnStatus = "AVAILABLE"
 ) => {
   let conn;
@@ -468,6 +469,12 @@ const completeOrder = async (
       `Hoàn tất, trả xe từ đơn hàng ${order.ORDER_CODE}`,
       conn
     );
+    const parsedRating = parseFloat(rating);
+    if (!isNaN(parsedRating) && parsedRating >= 1 && parsedRating <= 5) {
+      // Lấy USER_ID từ đơn hàng đã hoàn thành
+      const userId = order.USER_ID; // Cập nhật rating
+      await userModel.updateRating(userId, parsedRating);
+    }
     await conn.commit();
     return { message: "Hoàn tất đơn hàng thành công." };
   } catch (error) {

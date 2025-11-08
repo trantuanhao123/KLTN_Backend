@@ -4,7 +4,7 @@ const router = express.Router();
 const dashboardController = require("../controllers/dashboardController");
 const authMiddleware = require("../middlewares/authMiddleware");
 const requireAdmin = require("../middlewares/requireAdmin");
-// Áp dụng middleware cho tất cả các route trong file này
+
 router.use(authMiddleware);
 router.use(requireAdmin);
 

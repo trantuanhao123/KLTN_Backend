@@ -1,6 +1,6 @@
 const { connection } = require("../config/database");
 
-// 🟢 Tạo người dùng mới
+// Tạo người dùng mới
 async function create(userData) {
   const sql = `
     INSERT INTO USERS 
@@ -19,7 +19,7 @@ async function create(userData) {
   return result.insertId;
 }
 
-// 🔍 Tìm theo email
+// Tìm theo email
 async function findByEmail(email) {
   const [rows] = await connection.query(`SELECT * FROM USERS WHERE EMAIL = ?`, [
     email,
@@ -27,7 +27,7 @@ async function findByEmail(email) {
   return rows[0];
 }
 
-// 🔍 Tìm theo ID
+// Tìm theo ID
 async function findById(userId) {
   const [rows] = await connection.query(
     `SELECT * FROM USERS WHERE USER_ID = ? AND IS_DELETED = 0`,
@@ -36,7 +36,7 @@ async function findById(userId) {
   return rows[0];
 }
 
-// 🔁 Cập nhật mật khẩu
+// Cập nhật mật khẩu
 async function resetPassword(userId, newPasswordHash) {
   const sql = `
     UPDATE USERS
@@ -66,7 +66,7 @@ async function getAll() {
   return rows;
 }
 
-// 🧩 Cập nhật thông tin người dùng
+// Cập nhật thông tin người dùng
 async function updateProfileInfo(userId, profileData) {
   // Chỉ cho phép cập nhật những trường này
   const allowedFields = [
@@ -105,7 +105,7 @@ async function updateProfileInfo(userId, profileData) {
   return result.affectedRows;
 }
 
-// 🖼️ Cập nhật URL ảnh đại diện (avatar)
+// Cập nhật URL ảnh đại diện (avatar)
 async function updateAvatar(userId, avatarUrl) {
   const sql = `
     UPDATE USERS 
@@ -116,7 +116,7 @@ async function updateAvatar(userId, avatarUrl) {
   return result.affectedRows;
 }
 
-// 💳 Cập nhật URL bằng lái xe
+// Cập nhật URL bằng lái xe
 async function updateLicense(userId, licenseUrls) {
   const sql = `
     UPDATE USERS 
@@ -131,7 +131,7 @@ async function updateLicense(userId, licenseUrls) {
   return result.affectedRows;
 }
 
-// ❌ Xóa mềm người dùng
+// Xóa mềm người dùng
 async function deleteById(userId) {
   const sql = `
     UPDATE USERS 
@@ -166,7 +166,7 @@ async function updateUnverifiedUser(userId, { phone, passwordHash, fullname }) {
   return result.affectedRows;
 }
 
-// 🆕 SET EMAIL ĐÃ XÁC THỰC 👈 (Hàm mới)
+// SET EMAIL ĐÃ XÁC THỰC
 async function setEmailAsVerified(userId) {
   const sql = `
     UPDATE USERS 
@@ -193,7 +193,7 @@ async function findByRole(role, conn = connection) {
   );
   return rows[0];
 }
-// 🆕 Lấy danh sách user nhẹ cho dropdown (chỉ ID và tên/email)
+// Lấy danh sách user nhẹ cho dropdown (chỉ ID và tên/email)
 async function getForDropdown(conn = connection) {
   const sql = `
     SELECT 
@@ -206,6 +206,23 @@ async function getForDropdown(conn = connection) {
   `;
   const [rows] = await conn.query(sql);
   return rows;
+}
+// Cập nhật Rating cho người dùng
+async function updateRating(userId, newRating) {
+  const sql = `
+    UPDATE USERS
+    SET RATING = 
+      CASE
+        -- TH1: Rating cũ (RATING) là NULL/0.00 (chưa có) -> Gán rating mới
+        WHEN RATING IS NULL OR RATING = 0.00 THEN ?
+        -- TH2: Rating cũ đã có -> Tính trung bình cộng (RATING + newRating) / 2
+        ELSE (RATING + ?) / 2
+      END,
+      UPDATED_AT = NOW()
+    WHERE USER_ID = ? AND IS_DELETED = 0
+`;
+  const [result] = await connection.query(sql, [newRating, newRating, userId]);
+  return result.affectedRows;
 }
 module.exports = {
   create,
@@ -223,4 +240,5 @@ module.exports = {
   setEmailAsVerified,
   findByRole,
   getForDropdown,
+  updateRating,
 };

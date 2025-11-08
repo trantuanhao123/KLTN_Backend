@@ -117,13 +117,14 @@ const handleCompleteOrder = async (req, res) => {
   try {
     const adminId = req.USER_ID; // Lấy từ authMiddleware (admin)
     const orderId = parseInt(req.params.id);
-    const { extraFee, note, carStatus } = req.body;
+    const { extraFee, note, carStatus, rating } = req.body;
 
     const result = await rentalOrderService.completeOrder(
       orderId,
       adminId,
       extraFee,
       note,
+      rating,
       carStatus
     );
     return res.status(200).json(result);
