@@ -70,7 +70,7 @@ const createIncident = async (incidentData, files, userId) => {
     if (admin) {
       // Kiểm tra nếu tìm thấy admin
       const title = "Báo cáo sự cố mới";
-      const content = `User (ID: ${userId}) vừa tạo báo cáo sự cố cho đơn hàng ${incidentData.ORDER_ID}.`;
+      const content = `Người dùng (ID: ${userId}) vừa tạo báo cáo sự cố cho đơn hàng.`;
 
       // Dùng NotificationModel.create (cho 1 user)
       await NotificationModel.create(
@@ -143,10 +143,10 @@ const updateIncidentDescription = async (incidentId, description, userId) => {
  * (Admin) Cập nhật trạng thái sự cố
  */
 const updateIncidentStatus = async (incidentId, status) => {
-  let conn = null; // 👈 1. Khai báo
+  let conn = null;
   try {
-    conn = await connection.getConnection(); // 👈 2. Lấy
-    await conn.beginTransaction(); // 👈 3. Bắt đầu
+    conn = await connection.getConnection();
+    await conn.beginTransaction();
 
     // 1. Lấy thông tin sự cố
     const incident = await IncidentModel.findById(incidentId, conn);
@@ -170,14 +170,14 @@ const updateIncidentStatus = async (incidentId, status) => {
       conn
     );
 
-    await conn.commit(); // 👈 4. Hoàn tất
+    await conn.commit();
     return { message: `Cập nhật trạng thái thành ${status} thành công.` };
   } catch (error) {
-    if (conn) await conn.rollback(); // 👈 5. Hoàn tác
+    if (conn) await conn.rollback();
     console.error("Lỗi khi cập nhật trạng thái (Service):", error);
     throw new Error("Lỗi khi cập nhật trạng thái sự cố.");
   } finally {
-    if (conn) conn.release(); // 👈 6. Trả
+    if (conn) conn.release();
   }
 };
 
@@ -185,10 +185,10 @@ const updateIncidentStatus = async (incidentId, status) => {
  * (User/Admin) Xóa sự cố
  */
 const deleteIncident = async (incidentId, user) => {
-  let conn = null; // 👈 1. Khai báo
+  let conn = null;
   try {
-    conn = await connection.getConnection(); // 👈 2. Lấy
-    await conn.beginTransaction(); // 👈 3. Bắt đầu
+    conn = await connection.getConnection();
+    await conn.beginTransaction();
 
     // 1. Kiểm tra quyền
     const incident = await IncidentModel.findById(incidentId, conn);
@@ -211,7 +211,7 @@ const deleteIncident = async (incidentId, user) => {
 
     // 4. Xóa file vật lý khỏi server (làm sau khi commit DB)
 
-    await conn.commit(); // 👈 4. Hoàn tất
+    await conn.commit();
 
     // 5. Xóa file (nên làm sau khi commit để nếu xóa file lỗi thì DB vẫn đúng)
     for (const media of mediaFiles) {
@@ -225,11 +225,11 @@ const deleteIncident = async (incidentId, user) => {
 
     return { message: "Xóa sự cố thành công." };
   } catch (error) {
-    if (conn) await conn.rollback(); // 👈 5. Hoàn tác
+    if (conn) await conn.rollback();
     console.error("Lỗi khi xóa sự cố (Service):", error);
     throw new Error(error.message || "Lỗi khi xóa sự cố.");
   } finally {
-    if (conn) conn.release(); // 👈 6. Trả
+    if (conn) conn.release();
   }
 };
 

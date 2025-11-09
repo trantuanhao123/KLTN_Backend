@@ -1,8 +1,7 @@
-// models/incident.model.js
 const { connection } = require("../config/database");
 
 /**
- * 🟢 Tạo sự cố mới (dùng trong transaction)
+ * Tạo sự cố mới (dùng trong transaction)
  */
 const create = async (incidentData, conn = connection) => {
   const { ORDER_ID, USER_ID, CAR_ID, DESCRIPTION } = incidentData;
@@ -20,35 +19,91 @@ const create = async (incidentData, conn = connection) => {
 };
 
 /**
- * 🔍 Kiểm tra xem đơn hàng đã có sự cố chưa
+ * Kiểm tra xem đơn hàng đã có sự cố chưa
  */
 const findByOrderId = async (orderId, conn = connection) => {
-  const sql = "SELECT * FROM INCIDENT WHERE ORDER_ID = ? LIMIT 1";
+  const sql = `
+    SELECT 
+      i.*, 
+      o.ORDER_CODE AS order_code,
+      u.FULLNAME AS customer_name,
+      u.PHONE AS customer_phone,
+      c.BRAND AS car_brand,
+      c.MODEL AS car_model,
+      c.LICENSE_PLATE AS car_license_plate
+    FROM 
+      INCIDENT AS i
+    LEFT JOIN 
+      RENTAL_ORDER AS o ON i.ORDER_ID = o.ORDER_ID
+    LEFT JOIN 
+      USERS AS u ON i.USER_ID = u.USER_ID
+    LEFT JOIN 
+      CAR AS c ON i.CAR_ID = c.CAR_ID
+    WHERE 
+      i.ORDER_ID = ? 
+    LIMIT 1
+  `;
   const [rows] = await conn.query(sql, [orderId]);
   return rows[0];
 };
 
 /**
- * 🔍 Lấy sự cố theo ID
+ * Lấy sự cố theo ID
  */
 const findById = async (incidentId, conn = connection) => {
-  const sql = "SELECT * FROM INCIDENT WHERE INCIDENT_ID = ?";
+  const sql = `
+    SELECT 
+      i.*, 
+      o.ORDER_CODE AS order_code,
+      u.FULLNAME AS customer_name,
+      u.PHONE AS customer_phone,
+      c.BRAND AS car_brand,
+      c.MODEL AS car_model,
+      c.LICENSE_PLATE AS car_license_plate
+    FROM 
+      INCIDENT AS i
+    LEFT JOIN 
+      RENTAL_ORDER AS o ON i.ORDER_ID = o.ORDER_ID
+    LEFT JOIN 
+      USERS AS u ON i.USER_ID = u.USER_ID
+    LEFT JOIN 
+      CAR AS c ON i.CAR_ID = c.CAR_ID
+    WHERE 
+      i.INCIDENT_ID = ?
+  `;
   const [rows] = await conn.query(sql, [incidentId]);
   return rows[0];
 };
 
 /**
- * 🔍 Lấy danh sách sự cố (cho Admin)
- * (Có thể mở rộng thêm filter, pagination)
+ * Lấy danh sách sự cố (cho Admin)
  */
 const findAll = async (conn = connection) => {
-  const sql = "SELECT * FROM INCIDENT ORDER BY CREATED_AT DESC";
+  const sql = `
+    SELECT 
+      i.*, 
+      o.ORDER_CODE AS order_code,
+      u.FULLNAME AS customer_name,
+      c.BRAND AS car_brand,
+      c.MODEL AS car_model,
+      c.LICENSE_PLATE AS car_license_plate
+    FROM 
+      INCIDENT AS i
+    LEFT JOIN 
+      RENTAL_ORDER AS o ON i.ORDER_ID = o.ORDER_ID
+    LEFT JOIN 
+      USERS AS u ON i.USER_ID = u.USER_ID
+    LEFT JOIN 
+      CAR AS c ON i.CAR_ID = c.CAR_ID
+    ORDER BY 
+      i.CREATED_AT DESC
+  `;
   const [rows] = await conn.query(sql);
   return rows;
 };
 
 /**
- * 📝 Cập nhật mô tả (User)
+ * Cập nhật mô tả (User)
  */
 const updateDescription = async (
   incidentId,
@@ -63,7 +118,7 @@ const updateDescription = async (
 };
 
 /**
- * 🔄 Cập nhật trạng thái (Admin)
+ * Cập nhật trạng thái (Admin)
  */
 const updateStatus = async (incidentId, status, conn = connection) => {
   // Nếu là 'RESOLVED' hoặc 'CLOSED' thì cập nhật RESOLVED_AT
@@ -80,7 +135,7 @@ const updateStatus = async (incidentId, status, conn = connection) => {
 };
 
 /**
- * ❌ Xóa sự cố
+ * Xóa sự cố
  * (ON DELETE CASCADE sẽ tự xóa INCIDENT_MEDIA)
  */
 const remove = async (incidentId, conn = connection) => {

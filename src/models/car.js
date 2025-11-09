@@ -91,6 +91,7 @@ const getCarById = async (carId) => {
       C.INSURANCE_INFO,
       C.CURRENT_MILEAGE,
       C.CREATED_AT,
+      C.RATING,
       CAT.CATEGORY_ID,
       CAT.NAME AS CATEGORY_NAME,
       B.BRANCH_ID,

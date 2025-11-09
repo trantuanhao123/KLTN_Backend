@@ -1,9 +1,8 @@
 const { connection } = require("../config/database");
 
 /**
- * 🟢 Tạo một thông báo (cho 1 user)
+ * Tạo một thông báo (cho 1 user)
  * Hàm này được thiết kế để có thể chạy bên trong một transaction
- * (ví dụ: khi hủy đơn hàng, gửi thông báo thất bại sẽ không rollback)
  */
 const create = async (notificationData, conn = connection) => {
   const sql = `
@@ -30,8 +29,7 @@ const create = async (notificationData, conn = connection) => {
 };
 
 /**
- * 🟢 Tạo nhiều thông báo cùng lúc (cho chức năng "Gửi tất cả")
- * Dùng INSERT ... VALUES ?, với ? là một mảng 2 chiều [[...], [...]]
+ * Tạo nhiều thông báo cùng lúc (cho chức năng "Gửi tất cả")
  */
 const createBulk = async (notificationsData, conn = connection) => {
   const sql = `
@@ -50,7 +48,7 @@ const createBulk = async (notificationsData, conn = connection) => {
 };
 
 /**
- * 🔍 Lấy tất cả thông báo cho một user (mới nhất trước)
+ * Lấy tất cả thông báo cho một user (mới nhất trước)
  */
 const findByUserId = async (userId, conn = connection) => {
   const sql = `
@@ -63,7 +61,7 @@ const findByUserId = async (userId, conn = connection) => {
 };
 
 /**
- * 📈 Đếm số thông báo chưa đọc
+ *  Đếm số thông báo chưa đọc
  */
 const getUnreadCount = async (userId, conn = connection) => {
   const sql = `
@@ -76,8 +74,7 @@ const getUnreadCount = async (userId, conn = connection) => {
 };
 
 /**
- * ✅ Đánh dấu một thông báo là đã đọc
- * (Quan trọng: Phải kiểm tra cả USER_ID để đảm bảo user này sở hữu thông báo đó)
+ * Đánh dấu một thông báo là đã đọc
  */
 const markAsRead = async (notificationId, userId, conn = connection) => {
   const sql = `
@@ -90,7 +87,7 @@ const markAsRead = async (notificationId, userId, conn = connection) => {
 };
 
 /**
- * ✅✅ Đánh dấu TẤT CẢ thông báo là đã đọc
+ *  Đánh dấu TẤT CẢ thông báo là đã đọc
  */
 const markAllAsRead = async (userId, conn = connection) => {
   const sql = `

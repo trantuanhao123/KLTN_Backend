@@ -723,35 +723,32 @@ const adminGetAllOrders = async () => {
  */
 const adminGetOrderById = async (orderId) => {
   try {
-    // 1. Lấy thông tin đơn hàng
-    const order = await rentalOrderModel.findById(orderId);
-    if (!order) {
+    // 1. Lấy thông tin đơn hàng KÈM REVIEW
+    const orderWithReview = await rentalOrderModel.findDetailById(orderId);
+    if (!orderWithReview) {
       throw new Error("Không tìm thấy đơn hàng.");
     }
+    const order = orderWithReview; // order đã có trường order.review
 
     // 2. Lấy tất cả giao dịch liên quan
     const payments = await paymentModel.findByOrderId(orderId);
 
-    // --- [LOGIC MỚI BẮT ĐẦU TỪ ĐÂY] ---
+    // 3. Tính toán số tiền còn lại (nếu là PARTIAL)
     let remainingAmount = 0;
 
-    // 3. Nếu là đơn cọc (PARTIAL)
     if (order.PAYMENT_STATUS === "PARTIAL") {
-      // Tính tổng tiền đã trả từ danh sách 'payments'
       const totalPaid = payments
-        .filter((p) => p.STATUS === "SUCCESS" && p.AMOUNT > 0) // Chỉ tính giao dịch thành công, dương
+        .filter((p) => p.STATUS === "SUCCESS" && p.AMOUNT > 0)
         .reduce((sum, p) => sum + parseFloat(p.AMOUNT), 0);
 
-      // Tính số tiền còn lại
       remainingAmount = order.FINAL_AMOUNT - totalPaid;
     }
-    // --- [LOGIC MỚI KẾT THÚC] ---
 
     // 4. Gộp lại
     return {
       ...order,
-      remainingAmount: Math.max(0, remainingAmount), // Thêm trường mới
-      payments: payments, // Thêm danh sách giao dịch vào chi tiết
+      remainingAmount: Math.max(0, remainingAmount),
+      payments: payments,
     };
   } catch (error) {
     console.error("Lỗi khi lấy chis tiết đơn hàng (Service):", error);

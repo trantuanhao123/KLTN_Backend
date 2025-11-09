@@ -115,13 +115,78 @@ const hardDeleteById = async (orderId, conn = connection) => {
  * [MỚI] (Admin) Lấy tất cả đơn hàng của một User
  */
 const findByUserId = async (userId, conn = connection) => {
-  const [rows] = await conn.execute(
-    "SELECT * FROM RENTAL_ORDER WHERE USER_ID = ? ORDER BY CREATED_AT DESC",
-    [userId]
-  );
-  return rows;
-};
+  const sql = `
+    SELECT 
+      ro.*,
+      r.REVIEW_ID, 
+      r.RATING, 
+      r.CONTENT, 
+      r.CREATED_AT AS REVIEW_CREATED_AT
+    FROM RENTAL_ORDER ro
+    LEFT JOIN REVIEW r ON ro.ORDER_ID = r.ORDER_ID
+    WHERE ro.USER_ID = ? 
+    ORDER BY ro.CREATED_AT DESC
+  `;
 
+  const [rows] = await conn.execute(sql, [userId]);
+
+  // Xử lý kết quả để trả về mảng đơn hàng, mỗi đơn có đính kèm đối tượng review
+  return rows.map((row) => {
+    // Tách thông tin Review
+    const review = row.REVIEW_ID
+      ? {
+          REVIEW_ID: row.REVIEW_ID,
+          RATING: row.RATING,
+          CONTENT: row.CONTENT,
+          CREATED_AT: row.REVIEW_CREATED_AT,
+        }
+      : null;
+    delete row.REVIEW_ID;
+    delete row.RATING;
+    delete row.CONTENT;
+    delete row.REVIEW_CREATED_AT;
+
+    return {
+      ...row,
+      review: review,
+    };
+  });
+};
+const findDetailById = async (orderId, conn = connection) => {
+  const sql = `
+    SELECT
+      ro.*,
+      r.REVIEW_ID, r.RATING, r.CONTENT, r.CREATED_AT AS REVIEW_CREATED_AT
+    FROM RENTAL_ORDER ro
+    LEFT JOIN REVIEW r ON ro.ORDER_ID = r.ORDER_ID
+    WHERE ro.ORDER_ID = ?
+  `;
+
+  const [rows] = await conn.execute(sql, [orderId]);
+
+  if (rows.length === 0) return null;
+
+  const order = rows[0];
+
+  const review = order.REVIEW_ID
+    ? {
+        REVIEW_ID: order.REVIEW_ID,
+        RATING: order.RATING,
+        CONTENT: order.CONTENT,
+        CREATED_AT: order.REVIEW_CREATED_AT,
+      }
+    : null;
+
+  delete order.REVIEW_ID;
+  delete order.RATING;
+  delete order.CONTENT;
+  delete order.REVIEW_CREATED_AT;
+
+  return {
+    ...order,
+    review: review,
+  };
+};
 module.exports = {
   create,
   findById,
@@ -131,4 +196,5 @@ module.exports = {
   findExpiredPendingOrders,
   adminGetAllWithTxCount,
   hardDeleteById,
+  findDetailById,
 };
