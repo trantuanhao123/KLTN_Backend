@@ -1,10 +1,5 @@
 const { connection } = require("../config/database");
 
-/**
- * Thêm một bản ghi thanh toán mới (cho PayOS, Tiền mặt, Refund)
- * @param {object} paymentData Dữ liệu thanh toán
- * @param {object} conn Kết nối transaction
- */
 const create = async (paymentData, conn = connection) => {
   const sql = `
     INSERT INTO PAYMENT (

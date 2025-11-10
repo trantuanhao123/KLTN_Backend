@@ -105,7 +105,7 @@ const handlePayOSWebhook = async (webhookBody) => {
   }
 };
 /**
- * [MỚI] (Admin) Lấy danh sách chờ hoàn tiền
+ * (Admin) Lấy danh sách chờ hoàn tiền
  */
 const adminGetPendingRefunds = async () => {
   try {

@@ -106,8 +106,7 @@ const createOrder = async (
     const rentalPrice = calculatePrice(car, startDate, endDate, rentalType);
     const totalAmount = rentalPrice; // Giá gốc
 
-    // ✅ SỬA LỖI Ở ĐÂY
-    let finalAmount = totalAmount; // Giá cuối cùng (phải là "let")
+    let finalAmount = totalAmount; // Giá cuối cùng
 
     let discountId = null;
 
@@ -117,7 +116,6 @@ const createOrder = async (
 
     //Xử lý mã giảm giá
     if (discountCode) {
-      // Tìm mã hợp lệ (trong transaction để lock)
       const discount = await discountModel.findValidCode(discountCode, conn);
 
       if (!discount) {

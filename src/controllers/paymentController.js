@@ -5,7 +5,6 @@ const handlePayOSWebhook = async (req, res) => {
   try {
     // req.body chứa toàn bộ data PayOS gửi
     await paymentService.handlePayOSWebhook(req.body);
-
     // Phải trả 200 OK để PayOS biết đã nhận
     return res
       .status(200)
