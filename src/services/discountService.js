@@ -1,6 +1,5 @@
-// src/services/discountService.js
 const discountModel = require("../models/discount");
-const { connection } = require("../config/database"); // Dùng cho transaction
+const { connection } = require("../config/database");
 
 // Hàm trợ giúp tạo lỗi có statusCode
 const createError = (message, statusCode) => {

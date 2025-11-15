@@ -54,7 +54,6 @@ async function getAll() {
       u.AVATAR_URL, u.ADDRESS, u.ID_CARD, u.LICENSE_FRONT_URL, u.LICENSE_BACK_URL,
       u.RATING, u.CREATED_AT, u.UPDATED_AT, u.IS_DELETED,
       
-      -- ✅ [THÊM MỚI] Đếm số đơn hàng của mỗi user
       (SELECT COUNT(*) 
        FROM RENTAL_ORDER ro 
        WHERE ro.USER_ID = u.USER_ID) AS orderCount
@@ -120,7 +119,10 @@ async function updateAvatar(userId, avatarUrl) {
 async function updateLicense(userId, licenseUrls) {
   const sql = `
     UPDATE USERS 
-    SET LICENSE_FRONT_URL = ?, LICENSE_BACK_URL = ?
+    SET 
+      LICENSE_FRONT_URL = ?, 
+      LICENSE_BACK_URL = ?,
+      VERIFIED = 0,
     WHERE USER_ID = ?
   `;
   const [result] = await connection.query(sql, [
@@ -176,11 +178,20 @@ async function setEmailAsVerified(userId) {
   const [result] = await connection.query(sql, [userId]);
   return result.affectedRows;
 }
-// ✅ Đánh dấu người dùng đã xác minh
+// Đánh dấu người dùng đã xác minh
 async function verifyUser(userId) {
   const sql = `
     UPDATE USERS 
     SET VERIFIED = 1, UPDATED_AT = NOW()
+    WHERE USER_ID = ? AND IS_DELETED = 0
+  `;
+  const [result] = await connection.query(sql, [userId]);
+  return result.affectedRows;
+}
+async function unverifyUser(userId) {
+  const sql = `
+    UPDATE USERS 
+    SET VERIFIED = 0, UPDATED_AT = NOW()
     WHERE USER_ID = ? AND IS_DELETED = 0
   `;
   const [result] = await connection.query(sql, [userId]);
@@ -235,6 +246,7 @@ module.exports = {
   updateProfileInfo,
   deleteById,
   verifyUser,
+  unverifyUser,
   reActiveById,
   updateUnverifiedUser,
   setEmailAsVerified,

@@ -36,11 +36,11 @@ async function register({ email, phone, password, fullname }) {
     });
   }
 
-  // 4. Tạo và gửi OTP (Giống hệt otpService.js)
+  // 4. Tạo và gửi OTP
   const otp = Math.floor(100000 + Math.random() * 900000).toString();
   const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 phút
 
-  await OtpModel.createToken(userId, otp, expiresAt); // 👈 Dùng OtpModel
+  await OtpModel.createToken(userId, otp, expiresAt);
 
   await transporter.sendMail({
     from: process.env.MAIL_USER,
@@ -139,20 +139,20 @@ async function loginAdmin({ email, password }) {
     token,
   };
 }
-// 🆕 Lấy danh sách người dùng
+// Lấy danh sách người dùng
 async function getAllUsers() {
   const users = await UserModel.getAll();
   return users;
 }
 
-// 🆕 Lấy thông tin người dùng theo ID
+// Lấy thông tin người dùng theo ID
 async function getUserById(userId) {
   const user = await UserModel.findById(userId);
   if (!user || user.IS_DELETED) throw new Error("Người dùng không tồn tại");
   return user;
 }
 
-// 🆕 Cập nhật thông tin người dùng
+// Cập nhật thông tin người dùng
 async function updateUserProfile(userId, profileData) {
   const affectedRows = await UserModel.updateProfileInfo(userId, profileData);
 
@@ -188,7 +188,7 @@ async function updateUserLicense(userId, licenseUrls) {
   return await UserModel.findById(userId);
 }
 
-// 🆕 Xóa người dùng (soft delete)
+// Xóa người dùng (soft delete)
 async function deleteUser(userId) {
   const affected = await UserModel.deleteById(userId);
   if (!affected) throw new Error("Không thể xóa người dùng");
@@ -200,16 +200,21 @@ async function reActiveUser(userId) {
   if (!affected) throw new Error("Không thể xóa người dùng");
   return true;
 }
-// 🆕 Xác minh tài khoản (VERIFIED = 1)
+// Xác minh tài khoản (VERIFIED = 1)
 async function verifyUser(userId) {
   const affected = await UserModel.verifyUser(userId);
   if (!affected) throw new Error("Không thể xác minh người dùng");
   return await UserModel.findById(userId);
 }
-// 🆕 Lấy danh sách user cho dropdown (Admin)
+// Hủy xác minh tài khoản (VERIFIED = 0)
+async function unverifyUser(userId) {
+  const affected = await UserModel.unverifyUser(userId);
+  if (!affected) throw new Error("Không thể hủy xác minh người dùng");
+  return await UserModel.findById(userId);
+}
+// Lấy danh sách user cho dropdown (Admin)
 async function getUsersForDropdown() {
   const users = await UserModel.getForDropdown();
-  // Format lại theo yêu cầu "mã -- tên"
   return users.map((user) => ({
     value: user.USER_ID, // Mã (để form submit)
     label: `${user.USER_ID} -- ${user.FULLNAME || user.EMAIL}`, // Tên (để hiển thị)
@@ -233,6 +238,7 @@ async function changePassword(userId, oldPassword, newPassword) {
 
   return { message: "Đổi mật khẩu thành công" };
 }
+
 module.exports = {
   register,
   verifyRegistration,
@@ -245,6 +251,7 @@ module.exports = {
   updateUserProfile,
   deleteUser,
   verifyUser,
+  unverifyUser,
   reActiveUser,
   getUsersForDropdown,
   changePassword,

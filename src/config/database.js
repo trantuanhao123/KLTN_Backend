@@ -12,7 +12,7 @@ const connection = mysql.createPool({
   queueLimit: 0,
 });
 async function checkConnection() {
-  let conn; // Biến tạm để giữ kết nối đơn lẻ lấy ra từ pool
+  let conn;
   try {
     console.log("Đang kiểm tra kết nối cơ sở dữ liệu...");
 
@@ -22,13 +22,10 @@ async function checkConnection() {
     // Trả lại kết nối vào pool ngay sau khi kiểm tra
     conn.release();
 
-    console.log("✅ Kết nối DB thành công! Pool đã sẵn sàng.");
+    console.log("Kết nối DB thành công! Pool đã sẵn sàng.");
     return connection; // Trả về đối tượng Pool (connection)
   } catch (error) {
-    console.error(
-      "❌ LỖI KẾT NỐI DB! Vui lòng kiểm tra thông số:",
-      error.message
-    );
+    console.error("LỖI KẾT NỐI DB! Vui lòng kiểm tra thông số:", error.message);
     // Ném lỗi để dừng ứng dụng nếu không thể kết nối
     throw new Error("Database connection failed: " + error.message);
   }

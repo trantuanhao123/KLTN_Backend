@@ -42,6 +42,12 @@ router.patch(
   userController.verifyUser
 );
 router.patch(
+  "/:id/unverify",
+  authMiddleware,
+  requireAdmin,
+  userController.unverifyUser
+);
+router.patch(
   "/unban/:id",
   authMiddleware,
   requireAdmin,

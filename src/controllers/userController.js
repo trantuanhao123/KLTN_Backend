@@ -216,6 +216,18 @@ async function verifyUser(req, res) {
     res.status(400).json({ error: error.message });
   }
 }
+async function unverifyUser(req, res) {
+  try {
+    const { id } = req.params;
+    const unverifiedUser = await UserService.unverifyUser(id);
+    res.json({
+      message: "Hủy xác minh người dùng thành công",
+      user: unverifiedUser,
+    });
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+}
 async function changePassword(req, res) {
   try {
     const userId = req.user.USER_ID; // Lấy từ JWT (authMiddleware)
@@ -251,6 +263,7 @@ module.exports = {
   uploadLicense,
   deleteUser,
   verifyUser,
+  unverifyUser,
   reActiveUser,
   changePassword,
 };

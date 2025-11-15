@@ -6,6 +6,7 @@ const { checkConnection } = require("./config/database");
 
 const rentalOrderService = require("./services/rentalOrderService");
 const webRouter = require("./routes/web");
+const googleAuthRoute = require("./routes/googleAuthRoutes");
 const userRouter = require("./routes/userRoutes");
 const otpRouter = require("./routes/otpRoutes");
 const carRouter = require("./routes/carRoutes");
@@ -37,6 +38,7 @@ configViewEngine(app);
 
 //khai bao route
 app.use("/", webRouter);
+app.use("/googleAuth", googleAuthRoute);
 app.use("/user", userRouter);
 app.use("/auth", otpRouter);
 app.use("/car", carRouter);
