@@ -2,6 +2,7 @@ const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const UserModel = require("../models/user");
 const OtpModel = require("../models/verifiedEmail");
+const notificationModel = require("../models/notification");
 const transporter = require("../config/nodemailer");
 
 async function register({ email, phone, password, fullname }) {
@@ -184,8 +185,34 @@ async function updateUserLicense(userId, licenseUrls) {
     throw new Error("Cập nhật thông tin bằng lái xe thất bại.");
   }
 
-  // Trả về thông tin người dùng đã được làm mới
-  return await UserModel.findById(userId);
+  // Lấy thông tin người dùng sau khi cập nhật thành công
+  const updatedUser = await UserModel.findById(userId);
+
+  // --- BỔ SUNG LOGIC THÔNG BÁO CHO ADMIN (ĐÃ ĐƠN GIẢN HÓA) ---
+  try {
+    const adminUser = await UserModel.findByRole("ADMIN");
+
+    if (adminUser && adminUser.USER_ID) {
+      // Thông báo đơn giản: Đã cập nhật, đợi xác minh.
+      await notificationModel.create({
+        USER_ID: adminUser.USER_ID, // Gửi cho Admin
+        TITLE: `Hồ sơ KYC mới cần kiểm tra`,
+        CONTENT: `Người dùng ${
+          updatedUser.FULLNAME || updatedUser.EMAIL
+        } (ID: ${userId}) vừa cập nhật bằng lái xe. Vui lòng xác minh hồ sơ.`,
+      });
+    } else {
+      console.warn(
+        "Không tìm thấy ADMIN user để gửi thông báo bằng lái xe mới."
+      );
+    }
+  } catch (notificationError) {
+    console.error(
+      "LỖI GỬI THÔNG BÁO ADMIN sau khi cập nhật bằng lái:",
+      notificationError
+    );
+  }
+  return updatedUser;
 }
 
 // Xóa người dùng (soft delete)

@@ -55,16 +55,16 @@ app.use("/incident", incidentRouter);
 app.use("/dashboard", dashboardRouter);
 app.use("/review", reviewRouter);
 
-console.log("⏰ Đã lên lịch cho Cron Job (quét đơn hết hạn) chạy mỗi phút.");
+console.log("Đã lên lịch cho Cron Job (quét đơn hết hạn) chạy mỗi phút.");
 
 cron.schedule("* * * * *", async () => {
-  console.log("CRON: ⏰ Bắt đầu chạy tác vụ quét đơn hàng hết hạn...");
+  console.log("CRON: Bắt đầu chạy tác vụ quét đơn hàng hết hạn...");
   try {
     // Gọi thẳng hàm service, không cần gọi qua API
     await rentalOrderService.processExpiredOrders();
-    console.log("CRON: ✅ Tác vụ quét đơn đã hoàn tất.");
+    console.log("CRON: Tác vụ quét đơn đã hoàn tất.");
   } catch (err) {
-    console.error("CRON: ❌ Lỗi khi đang chạy tác vụ quét đơn:", err.message);
+    console.error("CRON: Lỗi khi đang chạy tác vụ quét đơn:", err.message);
   }
 });
 // Hàm chính khởi động Server
@@ -72,11 +72,11 @@ async function startServer() {
   try {
     await checkConnection();
     app.listen(port, hostname, () => {
-      console.log(`🚀 Server is running successfully!`);
-      console.log(`📡 Access URL: http://${hostname}:${port}`);
+      console.log(`Server is running successfully!`);
+      console.log(`Access URL: http://${hostname}:${port}`);
     });
   } catch (error) {
-    console.error("⚠️ Khởi động thất bại. Server KHÔNG được bật do lỗi:");
+    console.error("Khởi động thất bại. Server KHÔNG được bật do lỗi:");
     process.exit(1);
   }
 }

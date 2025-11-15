@@ -122,7 +122,7 @@ async function updateLicense(userId, licenseUrls) {
     SET 
       LICENSE_FRONT_URL = ?, 
       LICENSE_BACK_URL = ?,
-      VERIFIED = 0,
+      VERIFIED = 0
     WHERE USER_ID = ?
   `;
   const [result] = await connection.query(sql, [
