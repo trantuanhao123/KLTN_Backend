@@ -104,7 +104,25 @@ async function login({ email, password }) {
     { expiresIn: process.env.JWT_EXPIRES_IN || "1h" }
   );
 
-  return { token, user };
+  const userInfo = {
+    USER_ID: user.USER_ID,
+    EMAIL: user.EMAIL,
+    PHONE: user.PHONE,
+    ROLE: user.ROLE,
+    VERIFIED: user.VERIFIED, // Lưu ý: Đảm bảo trường này khớp với DB (IS_EMAIL_VERIFIED hay VERIFIED)
+    PROVIDER: user.PROVIDER,
+    FULLNAME: user.FULLNAME,
+    BIRTHDATE: user.BIRTHDATE,
+    AVATAR_URL: user.AVATAR_URL,
+    ADDRESS: user.ADDRESS,
+    ID_CARD: user.ID_CARD,
+    LICENSE_FRONT_URL: user.LICENSE_FRONT_URL,
+    LICENSE_BACK_URL: user.LICENSE_BACK_URL,
+    RATING: user.RATING,
+    CREATED_AT: user.CREATED_AT,
+  };
+
+  return { token, user: userInfo };
 }
 
 async function loginAdmin({ email, password }) {
