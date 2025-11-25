@@ -55,14 +55,12 @@ app.use("/incident", incidentRouter);
 app.use("/dashboard", dashboardRouter);
 app.use("/review", reviewRouter);
 
-console.log("Đã lên lịch cho Cron Job (quét đơn hết hạn) chạy mỗi phút.");
+console.log("Đã lên lịch quét đơn hết hạn chạy mỗi phút.");
 
 cron.schedule("* * * * *", async () => {
-  console.log("CRON: Bắt đầu chạy tác vụ quét đơn hàng hết hạn...");
   try {
     // Gọi thẳng hàm service, không cần gọi qua API
     await rentalOrderService.processExpiredOrders();
-    console.log("CRON: Tác vụ quét đơn đã hoàn tất.");
   } catch (err) {
     console.error("CRON: Lỗi khi đang chạy tác vụ quét đơn:", err.message);
   }

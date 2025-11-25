@@ -263,7 +263,6 @@ const cancelPendingOrder = async (userId, orderId) => {
  */
 const processExpiredOrders = async () => {
   let conn;
-  console.log("CRON: Đang quét đơn hàng hết hạn...");
   try {
     conn = await connection.getConnection();
     const expiredOrders = await rentalOrderModel.findExpiredPendingOrders(conn);
@@ -283,7 +282,7 @@ const processExpiredOrders = async () => {
       try {
         orderConn = await connection.getConnection();
         await orderConn.beginTransaction();
-
+        const newStatus = "AVAILABLE";
         // 1. UPDATE RENTAL_ORDER
         await rentalOrderModel.update(
           order.ORDER_ID,
@@ -296,7 +295,7 @@ const processExpiredOrders = async () => {
         // 3. GHI LOG
         await carModel.logStatusChange(
           order.CAR_ID,
-          "RESERVED", // Logic: PENDING_PAYMENT order hết hạn
+          "RESERVED",
           newStatus,
           `Hệ thống tự hủy đơn hết hạn ${order.ORDER_ID}`,
           orderConn
@@ -314,10 +313,9 @@ const processExpiredOrders = async () => {
       }
     }
   } catch (error) {
-    // Lỗi khi lấy danh sách đơn (findExpiredPendingOrders)
     console.error("CRON: Lỗi nghiêm trọng khi quét đơn:", error);
   } finally {
-    if (conn) conn.release(); // Release kết nối chính
+    if (conn) conn.release();
   }
 };
 
