@@ -242,7 +242,7 @@ const cancelPendingOrder = async (userId, orderId) => {
     await carModel.logStatusChange(
       order.CAR_ID,
       "RESERVED", // Logic: PENDING_PAYMENT order luôn giữ xe "RESERVED"
-      newStatus,
+      "AVAILABLE",
       `Hủy đơn PENDING_PAYMENT ${order.ORDER_CODE}`,
       conn
     );
