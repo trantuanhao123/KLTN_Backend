@@ -1,10 +1,5 @@
-// services/dashboard.service.js
 const dashboardModel = require("../models/dashboard");
 
-/**
- * Lấy tất cả thống kê cho Dashboard chính
- * (Dùng Promise.all để chạy song song các query)
- */
 const getFullDashboard = async () => {
   try {
     const [
@@ -50,7 +45,6 @@ const getMostRentedCars = () => dashboardModel.getMostRentedCars(5);
 
 module.exports = {
   getFullDashboard,
-  // export riêng lẻ
   getMonthlyRevenue,
   getWeeklyRentalCount,
   getRecentRentals,

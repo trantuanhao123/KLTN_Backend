@@ -1,8 +1,9 @@
+// models/dashboard.js
 const { connection } = require("../config/database");
 
 /**
  * 1. Tổng doanh thu (theo tháng)
- * Lấy từ bảng PAYMENT (chỉ lấy giao dịch SUCCESS và không phải REFUND)
+ * Không có tham số -> dùng execute hay query đều được.
  */
 const getMonthlyRevenue = async () => {
   const sql = `
@@ -22,7 +23,7 @@ const getMonthlyRevenue = async () => {
 
 /**
  * 2. Lượt thuê theo tuần
- * Đếm các đơn hàng đã xác nhận/đang thuê/hoàn tất theo tuần
+ * Limit cứng 12 -> dùng execute được.
  */
 const getWeeklyRentalCount = async () => {
   const sql = `
@@ -42,8 +43,9 @@ const getWeeklyRentalCount = async () => {
 
 /**
  * 3. Lịch thuê gần đây (limit 3)
+ * [FIX]: Dùng connection.query thay vì execute vì có LIMIT ?
+ * [FIX]: Ép kiểu Number(limit) để đảm bảo an toàn
  */
-
 const getRecentRentals = async (limit = 3) => {
   const sql = `
     SELECT
@@ -56,14 +58,15 @@ const getRecentRentals = async (limit = 3) => {
     ORDER BY ro.CREATED_AT DESC
     LIMIT ?;
   `;
-  const [rows] = await connection.execute(sql, [limit]);
+  // SỬ DỤNG QUERY
+  const [rows] = await connection.query(sql, [Number(limit)]);
   return rows;
 };
 
 /**
  * 4. Báo cáo sự cố gần đây (limit 3)
+ * [FIX]: Dùng connection.query thay vì execute
  */
-
 const getRecentIncidents = async (limit = 3) => {
   const sql = `
     SELECT
@@ -76,12 +79,14 @@ const getRecentIncidents = async (limit = 3) => {
     ORDER BY i.CREATED_AT DESC
     LIMIT ?;
   `;
-  const [rows] = await connection.execute(sql, [limit]);
+  // SỬ DỤNG QUERY
+  const [rows] = await connection.query(sql, [Number(limit)]);
   return rows;
 };
 
 /**
  * 5. Doanh thu theo loại xe
+ * Không tham số -> execute ok
  */
 const getRevenueByCategory = async () => {
   const sql = `
@@ -105,6 +110,7 @@ const getRevenueByCategory = async () => {
 
 /**
  * 6. Xe được thuê nhiều nhất
+ * [FIX]: Dùng connection.query thay vì execute vì có LIMIT ?
  */
 const getMostRentedCars = async (limit = 5) => {
   const sql = `
@@ -119,32 +125,38 @@ const getMostRentedCars = async (limit = 5) => {
     ORDER BY rentalCount DESC
     LIMIT ?;
   `;
-  const [rows] = await connection.execute(sql, [limit]);
+  // SỬ DỤNG QUERY
+  const [rows] = await connection.query(sql, [Number(limit)]);
   return rows;
 };
 
 /**
  * [BONUS] Các chỉ số tổng quan nhanh
+ * Các query đơn giản -> execute ok
  */
 const getDashboardStats = async () => {
+  // Query 1
   const [revenue] = await connection.execute(`
     SELECT SUM(AMOUNT) AS totalRevenue 
     FROM PAYMENT 
     WHERE STATUS = 'SUCCESS' AND PAYMENT_TYPE != 'REFUND'
   `);
 
+  // Query 2
   const [rentals] = await connection.execute(`
     SELECT COUNT(ORDER_ID) AS totalRentals 
     FROM RENTAL_ORDER 
     WHERE STATUS IN ('CONFIRMED', 'IN_PROGRESS', 'COMPLETED')
   `);
 
+  // Query 3
   const [users] = await connection.execute(`
     SELECT COUNT(USER_ID) AS totalUsers 
     FROM \`USERS\` 
     WHERE ROLE = 'CUSTOMER'
   `);
 
+  // Query 4
   const [cars] = await connection.execute(`
     SELECT COUNT(CAR_ID) AS totalCars 
     FROM CAR 
