@@ -43,13 +43,14 @@ async function register({ email, phone, password, fullname }) {
 
   await OtpModel.createToken(userId, otp, expiresAt);
 
-  await transporter.sendMail({
+  transporter.sendMail({
     from: process.env.MAIL_USER,
     to: email,
     subject: "Mã xác nhận đăng ký tài khoản",
     text: `Mã OTP của bạn là: ${otp}. Mã này sẽ hết hạn trong 10 phút.`,
-  });
+  }).catch(err => console.error("Lỗi gửi mail ngầm:", err)); 
 
+  // Trả về kết quả ngay lập tức cho App
   return {
     message: "Đăng ký thành công. Vui lòng kiểm tra email để lấy mã OTP.",
     userId: userId,
