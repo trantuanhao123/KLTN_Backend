@@ -69,22 +69,18 @@ const remove = async (reviewId, conn = connection) => {
  * 6. Lấy tất cả Review theo CAR_ID, kèm thông tin người dùng
  */
 const findByCarId = async (carId, conn = connection) => {
-  const [rows] = await conn.execute(
-    `
+  const sql = `
     SELECT 
-      R.REVIEW_ID, 
-      R.RATING, 
-      R.CONTENT, 
-      R.CREATED_AT, 
-      U.FULLNAME AS USER_FULLNAME, 
-      U.AVATAR_URL AS USER_AVATAR
-    FROM REVIEW R
-    JOIN USERS U ON R.USER_ID = U.USER_ID
-    WHERE R.CAR_ID = ?
-    ORDER BY R.CREATED_AT DESC
-    `,
-    [carId]
-  );
+      r.REVIEW_ID, r.ORDER_ID, r.CAR_ID, r.RATING, r.CONTENT, r.CREATED_AT,
+      r.USER_ID, 
+      u.FULLNAME, 
+      u.AVATAR_URL 
+    FROM REVIEW r
+    LEFT JOIN USERS u ON r.USER_ID = u.USER_ID
+    WHERE r.CAR_ID = ?
+    ORDER BY r.CREATED_AT DESC
+  `;
+  const [rows] = await conn.query(sql, [carId]);
   return rows;
 };
 
