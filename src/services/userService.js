@@ -3,7 +3,7 @@ const jwt = require("jsonwebtoken");
 const UserModel = require("../models/user");
 const OtpModel = require("../models/verifiedEmail");
 const notificationModel = require("../models/notification");
-const transporter = require("../config/nodemailer");
+// const transporter = require("../config/nodemailer");
 const SibApiV3Sdk = require('sib-api-v3-sdk');
 const defaultClient = SibApiV3Sdk.ApiClient.instance;
 const apiKey = defaultClient.authentications['api-key'];
@@ -54,27 +54,20 @@ async function register({ email, phone, password, fullname }) {
   //   subject: "Mã xác nhận đăng ký tài khoản",
   //   text: `Mã OTP của bạn là: ${otp}. Mã này sẽ hết hạn trong 10 phút.`,
   // }).catch(err => console.error("Lỗi gửi mail ngầm:", err)); 
+  const apiInstance = new SibApiV3Sdk.TransactionalEmailsApi();
+  const sendSmtpEmail = new SibApiV3Sdk.SendSmtpEmail();
+
   sendSmtpEmail.subject = "Mã xác nhận đăng ký tài khoản";
-  sendSmtpEmail.htmlContent = `
-    <div style="font-family: Arial, sans-serif; padding: 20px;">
-      <h2>Xác thực đăng ký</h2>
-      <p>Mã OTP của bạn là: <strong style="font-size: 24px; color: #1CE88A;">${otp}</strong></p>
-      <p>Mã này sẽ hết hạn trong 10 phút.</p>
-    </div>`;
-  
-  // Người gửi (Phải là email đã verify trên Brevo)
+  sendSmtpEmail.htmlContent = `<html><body><p>Mã OTP của bạn là: <strong>${otp}</strong>. Mã này sẽ hết hạn trong 10 phút.</p></body></html>`;
   sendSmtpEmail.sender = { "name": "KLTN App", "email": process.env.MAIL_SENDER };
-  
-  // Người nhận (Email người dùng nhập vào)
   sendSmtpEmail.to = [{ "email": email }];
 
-  // Gọi API gửi mail (KHÔNG DÙNG AWAIT để trả về ngay lập tức)
   apiInstance.sendTransacEmail(sendSmtpEmail).then(
     function(data) {
-      console.log('✅ Brevo: Gửi mail thành công. ID:', data.messageId);
+      console.log('Brevo: Gửi mail thành công. MessageId: ' + data.messageId);
     },
     function(error) {
-      console.error('❌ Brevo: Lỗi gửi mail:', error);
+      console.error('Brevo: Lỗi gửi mail:', error);
     }
   );
 
