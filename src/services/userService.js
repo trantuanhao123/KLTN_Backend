@@ -4,6 +4,11 @@ const UserModel = require("../models/user");
 const OtpModel = require("../models/verifiedEmail");
 const notificationModel = require("../models/notification");
 const transporter = require("../config/nodemailer");
+const SibApiV3Sdk = require('sib-api-v3-sdk');
+const defaultClient = SibApiV3Sdk.ApiClient.instance;
+const apiKey = defaultClient.authentications['api-key'];
+apiKey.apiKey = process.env.BREVO_API_KEY; 
+const apiInstance = new SibApiV3Sdk.TransactionalEmailsApi();
 
 async function register({ email, phone, password, fullname }) {
   const existingUser = await UserModel.findByEmail(email);
@@ -43,14 +48,36 @@ async function register({ email, phone, password, fullname }) {
 
   await OtpModel.createToken(userId, otp, expiresAt);
 
-  transporter.sendMail({
-    from: process.env.MAIL_USER,
-    to: email,
-    subject: "Mã xác nhận đăng ký tài khoản",
-    text: `Mã OTP của bạn là: ${otp}. Mã này sẽ hết hạn trong 10 phút.`,
-  }).catch(err => console.error("Lỗi gửi mail ngầm:", err)); 
+  // transporter.sendMail({
+  //   from: process.env.MAIL_USER,
+  //   to: email,
+  //   subject: "Mã xác nhận đăng ký tài khoản",
+  //   text: `Mã OTP của bạn là: ${otp}. Mã này sẽ hết hạn trong 10 phút.`,
+  // }).catch(err => console.error("Lỗi gửi mail ngầm:", err)); 
+  sendSmtpEmail.subject = "Mã xác nhận đăng ký tài khoản";
+  sendSmtpEmail.htmlContent = `
+    <div style="font-family: Arial, sans-serif; padding: 20px;">
+      <h2>Xác thực đăng ký</h2>
+      <p>Mã OTP của bạn là: <strong style="font-size: 24px; color: #1CE88A;">${otp}</strong></p>
+      <p>Mã này sẽ hết hạn trong 10 phút.</p>
+    </div>`;
+  
+  // Người gửi (Phải là email đã verify trên Brevo)
+  sendSmtpEmail.sender = { "name": "KLTN App", "email": process.env.MAIL_SENDER };
+  
+  // Người nhận (Email người dùng nhập vào)
+  sendSmtpEmail.to = [{ "email": email }];
 
-  // Trả về kết quả ngay lập tức cho App
+  // Gọi API gửi mail (KHÔNG DÙNG AWAIT để trả về ngay lập tức)
+  apiInstance.sendTransacEmail(sendSmtpEmail).then(
+    function(data) {
+      console.log('✅ Brevo: Gửi mail thành công. ID:', data.messageId);
+    },
+    function(error) {
+      console.error('❌ Brevo: Lỗi gửi mail:', error);
+    }
+  );
+
   return {
     message: "Đăng ký thành công. Vui lòng kiểm tra email để lấy mã OTP.",
     userId: userId,
