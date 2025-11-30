@@ -1,7 +1,12 @@
 const bcrypt = require("bcrypt");
 const UserModel = require("../models/user");
 const tokenModel = require("../models/passWordResetToken");
-const transporter = require("../config/nodemailer");
+// const transporter = require("../config/nodemailer");
+const SibApiV3Sdk = require('sib-api-v3-sdk');
+const defaultClient = SibApiV3Sdk.ApiClient.instance;
+const apiKey = defaultClient.authentications['api-key'];
+apiKey.apiKey = process.env.BREVO_API_KEY; 
+const apiInstance = new SibApiV3Sdk.TransactionalEmailsApi();
 
 async function sendOtpForReset(email) {
   const user = await UserModel.findByEmail(email);
@@ -14,13 +19,34 @@ async function sendOtpForReset(email) {
   await tokenModel.createToken(user.USER_ID, otp, expiresAt);
 
   // Gửi mail
-  await transporter.sendMail({
-    from: process.env.MAIL_USER,
-    to: email,
-    subject: "Mã xác nhận đặt lại mật khẩu",
-    text: `Mã OTP của bạn là: ${otp}. Mã này sẽ hết hạn trong ${expiresInMinutes} phút.`,
-  });
-  return true;
+  const sendSmtpEmail = new SibApiV3Sdk.SendSmtpEmail();
+  
+  sendSmtpEmail.subject = "Mã xác nhận đặt lại mật khẩu";
+  sendSmtpEmail.htmlContent = `
+    <div style="font-family: Arial, sans-serif; padding: 20px;">
+      <h2>Yêu cầu đặt lại mật khẩu</h2>
+      <p>Mã OTP của bạn là: <strong style="font-size: 24px; color: #E74C3C;">${otp}</strong></p>
+      <p>Mã này sẽ hết hạn trong ${expiresInMinutes} phút.</p>
+      <p>Nếu bạn không yêu cầu, vui lòng bỏ qua email này.</p>
+    </div>`;
+  
+  // Người gửi (Lấy từ biến môi trường)
+  sendSmtpEmail.sender = { "name": "KLTN App", "email": process.env.MAIL_SENDER };
+  
+  // Người nhận
+  sendSmtpEmail.to = [{ "email": email }];
+
+  // Gọi API gửi mail 
+  apiInstance.sendTransacEmail(sendSmtpEmail).then(
+    function(data) {
+      console.log('OTP Reset Password sent. ID:', data.messageId);
+    },
+    function(error) {
+      console.error('Error sending OTP Reset Password:', error);
+    }
+  );
+
+  return true; 
 }
 
 /**
