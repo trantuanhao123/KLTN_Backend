@@ -30,7 +30,7 @@ async function sendOtpForReset(email) {
       <p>Nếu bạn không yêu cầu, vui lòng bỏ qua email này.</p>
     </div>`;
   
-  // Người gửi (Lấy từ biến môi trường)
+  // Người gửi 
   sendSmtpEmail.sender = { "name": "KLTN App", "email": process.env.MAIL_SENDER };
   
   // Người nhận

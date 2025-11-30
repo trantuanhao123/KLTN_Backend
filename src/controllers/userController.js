@@ -250,6 +250,17 @@ async function changePassword(req, res) {
     res.status(400).json({ error: error.message });
   }
 }
+async function resendRegisterOtp(req, res) {
+  try {
+    const { email } = req.body;
+    if (!email) return res.status(400).json({ error: "Vui lòng cung cấp email." });
+    
+    const result = await UserService.resendRegisterOtp(email);
+    res.json(result);
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+}
 module.exports = {
   register,
   verifyRegistration,
@@ -266,4 +277,5 @@ module.exports = {
   unverifyUser,
   reActiveUser,
   changePassword,
+  resendRegisterOtp,
 };

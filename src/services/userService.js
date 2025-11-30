@@ -109,6 +109,37 @@ async function verifyRegistration({ email, otp }) {
   return { token, user: verifiedUser };
 }
 
+async function resendRegisterOtp(email) {
+  const user = await UserModel.findByEmail(email);
+  if (!user) throw new Error("Email chưa được đăng ký.");
+  if (user.IS_EMAIL_VERIFIED) throw new Error("Tài khoản này đã được kích hoạt. Vui lòng đăng nhập.");
+
+  // Tạo OTP mới
+  const otp = Math.floor(100000 + Math.random() * 900000).toString();
+  const expiresAt = new Date(Date.now() + 10 * 60 * 1000); 
+
+  await OtpModel.createToken(user.USER_ID, otp, expiresAt);
+
+  // Gửi mail qua Brevo
+  const sendSmtpEmail = new SibApiV3Sdk.SendSmtpEmail();
+  sendSmtpEmail.subject = "Gửi lại mã xác nhận đăng ký";
+  sendSmtpEmail.htmlContent = `
+    <div style="font-family: Arial, sans-serif; padding: 20px;">
+      <h2>Xác thực đăng ký (Gửi lại)</h2>
+      <p>Mã OTP mới của bạn là: <strong style="font-size: 24px; color: #1CE88A;">${otp}</strong></p>
+      <p>Mã này sẽ hết hạn trong 10 phút.</p>
+    </div>`;
+  sendSmtpEmail.sender = { "name": "KLTN App", "email": process.env.MAIL_SENDER };
+  sendSmtpEmail.to = [{ "email": email }];
+
+  apiInstance.sendTransacEmail(sendSmtpEmail).then(
+    (data) => console.log('Brevo Resend OTP Success:', data.messageId),
+    (err) => console.error('Brevo Resend OTP Error:', err)
+  );
+
+  return { message: "Đã gửi lại mã OTP." };
+}
+
 async function login({ email, password }) {
   const user = await UserModel.findByEmail(email);
   if (!user) throw new Error("Sai tài khoản hoặc mật khẩu");
@@ -321,4 +352,5 @@ module.exports = {
   reActiveUser,
   getUsersForDropdown,
   changePassword,
+  resendRegisterOtp,
 };
