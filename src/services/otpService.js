@@ -31,7 +31,7 @@ async function sendOtpForReset(email) {
     </div>`;
   
   // Người gửi 
-  sendSmtpEmail.sender = { "name": "KLTN App", "email": process.env.MAIL_SENDER };
+  sendSmtpEmail.sender = { "name": "Thuê Xe Việt", "email": process.env.MAIL_SENDER };
   
   // Người nhận
   sendSmtpEmail.to = [{ "email": email }];

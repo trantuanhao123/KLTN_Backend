@@ -59,7 +59,7 @@ async function register({ email, phone, password, fullname }) {
 
   sendSmtpEmail.subject = "Mã xác nhận đăng ký tài khoản";
   sendSmtpEmail.htmlContent = `<html><body><p>Mã OTP của bạn là: <strong>${otp}</strong>. Mã này sẽ hết hạn trong 10 phút.</p></body></html>`;
-  sendSmtpEmail.sender = { "name": "KLTN App", "email": process.env.MAIL_SENDER };
+  sendSmtpEmail.sender = { "name": "Thuê Xe Việt", "email": process.env.MAIL_SENDER };
   sendSmtpEmail.to = [{ "email": email }];
 
   apiInstance.sendTransacEmail(sendSmtpEmail).then(
@@ -129,7 +129,7 @@ async function resendRegisterOtp(email) {
       <p>Mã OTP mới của bạn là: <strong style="font-size: 24px; color: #1CE88A;">${otp}</strong></p>
       <p>Mã này sẽ hết hạn trong 10 phút.</p>
     </div>`;
-  sendSmtpEmail.sender = { "name": "KLTN App", "email": process.env.MAIL_SENDER };
+  sendSmtpEmail.sender = { "name": "Thuê Xe Việt", "email": process.env.MAIL_SENDER };
   sendSmtpEmail.to = [{ "email": email }];
 
   apiInstance.sendTransacEmail(sendSmtpEmail).then(
