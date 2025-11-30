@@ -11,7 +11,7 @@ router.post("/login", userController.login);
 router.post("/loginAdmin", userController.loginAdmin);
 router.get("/profile", authMiddleware, userController.profile);
 router.post("/change-password", authMiddleware, userController.changePassword);
-router.post("/resend-register-otp", UserController.resendRegisterOtp);
+router.post("/resend-register-otp", userController.resendRegisterOtp);
 
 //Update Profile
 router.put("/editProfile/:id", authMiddleware, userController.updateProfile);
