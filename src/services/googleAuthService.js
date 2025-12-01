@@ -37,7 +37,7 @@ async function handleGoogleUpsert(userData) {
           `UPDATE USERS 
              SET PROVIDER = ?, PROVIDER_ID = ?, 
                  FULLNAME = COALESCE(FULLNAME, ?), AVATAR_URL = COALESCE(AVATAR_URL, ?),
-                 IS_EMAIL_VERIFIED = 1, VERIFIED = 1, UPDATED_AT = CURRENT_TIMESTAMP 
+                 IS_EMAIL_VERIFIED = 1, VERIFIED = 0, UPDATED_AT = CURRENT_TIMESTAMP 
              WHERE USER_ID = ?`,
           [PROVIDER_NAME, googleId, fullName, avatarUrl, userId]
         );
@@ -47,7 +47,7 @@ async function handleGoogleUpsert(userData) {
       const [result] = await conn.execute(
         `INSERT INTO USERS 
            (EMAIL, PROVIDER, PROVIDER_ID, FULLNAME, AVATAR_URL, IS_EMAIL_VERIFIED, VERIFIED, ROLE) 
-           VALUES (?, ?, ?, ?, ?, 1, 1, 'CUSTOMER')`,
+           VALUES (?, ?, ?, ?, ?, 1, 0, 'CUSTOMER')`,
         [email, PROVIDER_NAME, googleId, fullName, avatarUrl]
       );
       userId = result.insertId;
