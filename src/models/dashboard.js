@@ -1,19 +1,17 @@
-// models/dashboard.js
 const { connection } = require("../config/database");
 
 /**
  * 1. Tổng doanh thu (theo tháng)
- * Không có tham số -> dùng execute hay query đều được.
+ * [UPDATED]: Tính tổng FINAL_AMOUNT từ bảng RENTAL_ORDER
  */
 const getMonthlyRevenue = async () => {
   const sql = `
     SELECT
-      DATE_FORMAT(TRANSACTION_DATE, '%Y-%m') AS month,
-      SUM(AMOUNT) AS totalRevenue
-    FROM PAYMENT
+      DATE_FORMAT(CREATED_AT, '%Y-%m') AS month,
+      SUM(FINAL_AMOUNT) AS totalRevenue
+    FROM RENTAL_ORDER
     WHERE 
-      STATUS = 'SUCCESS' 
-      AND PAYMENT_TYPE != 'REFUND'
+      STATUS IN ('CONFIRMED', 'IN_PROGRESS', 'COMPLETED')
     GROUP BY month
     ORDER BY month DESC;
   `;
@@ -23,7 +21,7 @@ const getMonthlyRevenue = async () => {
 
 /**
  * 2. Lượt thuê theo tuần
- * Limit cứng 12 -> dùng execute được.
+ * (Giữ nguyên)
  */
 const getWeeklyRentalCount = async () => {
   const sql = `
@@ -42,9 +40,8 @@ const getWeeklyRentalCount = async () => {
 };
 
 /**
- * 3. Lịch thuê gần đây (limit 3)
- * [FIX]: Dùng connection.query thay vì execute vì có LIMIT ?
- * [FIX]: Ép kiểu Number(limit) để đảm bảo an toàn
+ * 3. Lịch thuê gần đây
+ * (Giữ nguyên)
  */
 const getRecentRentals = async (limit = 3) => {
   const sql = `
@@ -58,14 +55,13 @@ const getRecentRentals = async (limit = 3) => {
     ORDER BY ro.CREATED_AT DESC
     LIMIT ?;
   `;
-  // SỬ DỤNG QUERY
   const [rows] = await connection.query(sql, [Number(limit)]);
   return rows;
 };
 
 /**
- * 4. Báo cáo sự cố gần đây (limit 3)
- * [FIX]: Dùng connection.query thay vì execute
+ * 4. Báo cáo sự cố gần đây
+ * (Giữ nguyên)
  */
 const getRecentIncidents = async (limit = 3) => {
   const sql = `
@@ -79,28 +75,25 @@ const getRecentIncidents = async (limit = 3) => {
     ORDER BY i.CREATED_AT DESC
     LIMIT ?;
   `;
-  // SỬ DỤNG QUERY
   const [rows] = await connection.query(sql, [Number(limit)]);
   return rows;
 };
 
 /**
  * 5. Doanh thu theo loại xe
- * Không tham số -> execute ok
+ * [UPDATED]: Bỏ bảng PAYMENT, join trực tiếp từ RENTAL_ORDER sang CAR -> CATEGORY
  */
 const getRevenueByCategory = async () => {
   const sql = `
     SELECT
       cat.NAME AS categoryName,
-      SUM(p.AMOUNT) AS totalRevenue,
-      COUNT(DISTINCT ro.ORDER_ID) as rentalCount
-    FROM PAYMENT p
-    JOIN RENTAL_ORDER ro ON p.ORDER_ID = ro.ORDER_ID
+      SUM(ro.FINAL_AMOUNT) AS totalRevenue,
+      COUNT(ro.ORDER_ID) as rentalCount
+    FROM RENTAL_ORDER ro
     JOIN CAR c ON ro.CAR_ID = c.CAR_ID
     JOIN CATEGORY cat ON c.CATEGORY_ID = cat.CATEGORY_ID
     WHERE 
-      p.STATUS = 'SUCCESS' 
-      AND p.PAYMENT_TYPE != 'REFUND'
+      ro.STATUS IN ('CONFIRMED', 'IN_PROGRESS', 'COMPLETED')
     GROUP BY cat.CATEGORY_ID, cat.NAME
     ORDER BY totalRevenue DESC;
   `;
@@ -110,7 +103,7 @@ const getRevenueByCategory = async () => {
 
 /**
  * 6. Xe được thuê nhiều nhất
- * [FIX]: Dùng connection.query thay vì execute vì có LIMIT ?
+ * (Giữ nguyên)
  */
 const getMostRentedCars = async (limit = 5) => {
   const sql = `
@@ -125,38 +118,37 @@ const getMostRentedCars = async (limit = 5) => {
     ORDER BY rentalCount DESC
     LIMIT ?;
   `;
-  // SỬ DỤNG QUERY
   const [rows] = await connection.query(sql, [Number(limit)]);
   return rows;
 };
 
 /**
  * [BONUS] Các chỉ số tổng quan nhanh
- * Các query đơn giản -> execute ok
+ * [UPDATED]: Query 1 sửa thành tính tổng FINAL_AMOUNT từ RENTAL_ORDER
  */
 const getDashboardStats = async () => {
-  // Query 1
+  // Query 1: Tổng doanh thu (Dựa trên giá trị đơn hàng)
   const [revenue] = await connection.execute(`
-    SELECT SUM(AMOUNT) AS totalRevenue 
-    FROM PAYMENT 
-    WHERE STATUS = 'SUCCESS' AND PAYMENT_TYPE != 'REFUND'
+    SELECT SUM(FINAL_AMOUNT) AS totalRevenue 
+    FROM RENTAL_ORDER 
+    WHERE STATUS IN ('CONFIRMED', 'IN_PROGRESS', 'COMPLETED')
   `);
 
-  // Query 2
+  // Query 2: Tổng đơn thuê
   const [rentals] = await connection.execute(`
     SELECT COUNT(ORDER_ID) AS totalRentals 
     FROM RENTAL_ORDER 
     WHERE STATUS IN ('CONFIRMED', 'IN_PROGRESS', 'COMPLETED')
   `);
 
-  // Query 3
+  // Query 3: Tổng khách hàng
   const [users] = await connection.execute(`
     SELECT COUNT(USER_ID) AS totalUsers 
     FROM \`USERS\` 
     WHERE ROLE = 'CUSTOMER'
   `);
 
-  // Query 4
+  // Query 4: Tổng xe
   const [cars] = await connection.execute(`
     SELECT COUNT(CAR_ID) AS totalCars 
     FROM CAR 
