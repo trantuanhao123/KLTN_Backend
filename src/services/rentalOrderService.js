@@ -82,6 +82,37 @@ const calculatePrice = (car, startDate, endDate, rentalType) => {
 
   return Math.round(chargedDays * pricePerDay);
 };
+/**
+ * [ADMIN ONLY] Hàm tính giá chặt chẽ cho Web Admin
+ * Không dùng logic lai tạp (hybrid). Chọn gì tính nấy.
+ */
+const calculateStrictPrice = (car, startDate, endDate, rentalType) => {
+  const start = new Date(startDate);
+  const end = new Date(endDate);
+
+  // Validate cơ bản
+  if (isNaN(start.getTime()) || isNaN(end.getTime())) return 0;
+
+  // Validate Logic: Ngày trả phải sau ngày nhận
+  if (end <= start) return 0;
+
+  const totalMilliseconds = end - start;
+  const totalHours = totalMilliseconds / (1000 * 60 * 60);
+
+  // --- LOGIC TÍNH TOÁN ---
+  if (rentalType === "hour") {
+    // 1. Theo Giờ: Làm tròn lên từng giờ (Ví dụ: 2h15p -> 3h)
+    const chargedHours = Math.ceil(totalHours);
+    const pricePerHour = parseFloat(car.PRICE_PER_HOUR) || 0;
+    return Math.round(chargedHours * pricePerHour);
+  } else {
+    // 2. Theo Ngày: Làm tròn lên từng ngày (Ví dụ: 25h -> 2 ngày)
+    // Mặc định rentalType là 'day' hoặc null đều vào đây
+    const chargedDays = Math.max(Math.ceil(totalHours / 24), 1);
+    const pricePerDay = parseFloat(car.PRICE_PER_DAY) || 0;
+    return Math.round(chargedDays * pricePerDay);
+  }
+};
 
 /**
  * Bước 2: Khởi tạo đơn hàng (Ấn Đặt Xe)
@@ -848,28 +879,66 @@ const adminCreateManualOrder = async (adminId, orderDetails) => {
       carId,
       startDate,
       endDate,
-      paymentMethod, // 'CASH' hoặc 'NONE'
-      paymentStatus, // 'PAID', 'PARTIAL', 'UNPAID'
-      amountPaid, // Số tiền admin đã thu
+      rentalType,
+      paymentMethod,
+      paymentStatus,
+      amountPaid,
       note,
     } = orderDetails;
 
-    // 1. Lấy thông tin xe và kiểm tra
+    // 1. CHUẨN HÓA INPUT
+    // Nếu frontend không gửi, fallback về 'day'
+    const typeToUse = rentalType === "hour" ? "hour" : "day";
+
+    // 2. Lấy và kiểm tra xe
     const car = await carModel.getCarById(carId);
     if (!car) throw new Error("Không tìm thấy xe.");
     if (car.STATUS !== "AVAILABLE") throw new Error("Xe không khả dụng.");
 
-    // 2. Tính toán giá (Giả sử thuê theo ngày)
-    // Bạn cần điều chỉnh rentalType nếu có
-    const rentalPrice = calculatePrice(car, startDate, endDate, "day");
+    // 3. TÍNH GIÁ (DÙNG HÀM STRICT RIÊNG)
+    const rentalPrice = calculateStrictPrice(
+      car,
+      startDate,
+      endDate,
+      typeToUse
+    );
+
+    if (rentalPrice <= 0) {
+      throw new Error(
+        typeToUse === "hour"
+          ? "Lỗi tính giá: Giờ trả xe phải sau giờ nhận xe."
+          : "Lỗi tính giá: Ngày trả xe phải sau ngày nhận xe."
+      );
+    }
+
     const totalAmount = rentalPrice;
-    const finalAmount = totalAmount; // Bỏ qua logic giảm giá cho đơn giản
+    const finalAmount = totalAmount; // Có thể mở rộng logic giảm giá sau này
+
+    // 4. VALIDATE TIỀN NONG (Gatekeeper)
+    const paidAmount = parseFloat(amountPaid) || 0;
+
+    // Nếu chọn 'Thanh toán hết' -> Phải nhập đủ tiền
+    if (paymentStatus === "PAID" && paidAmount < finalAmount) {
+      throw new Error(
+        `Trạng thái là 'Thanh toán hết' nhưng số tiền nhập vào (${paidAmount}) nhỏ hơn tổng tiền (${finalAmount}).`
+      );
+    }
+    // Nếu chọn 'Đặt cọc' -> Phải có tiền cọc
+    if (paymentStatus === "PARTIAL" && paidAmount <= 0) {
+      throw new Error("Vui lòng nhập số tiền đặt cọc lớn hơn 0.");
+    }
 
     conn = await connection.getConnection();
     await conn.beginTransaction();
 
-    // 3. Tạo dữ liệu đơn hàng
     const orderCode = uuidv4();
+
+    // 5. TẠO NOTE TỰ ĐỘNG (Để minh bạch loại hình thuê)
+    const autoNote = `[Admin Book: ${
+      typeToUse === "hour" ? "Theo Giờ" : "Theo Ngày"
+    }]`;
+    const finalNote = note ? `${autoNote} ${note}` : autoNote;
+
     const orderData = {
       orderCode,
       userId,
@@ -879,73 +948,81 @@ const adminCreateManualOrder = async (adminId, orderDetails) => {
       rentalPrice,
       totalAmount,
       finalAmount,
-      expiresAt: null, // Không hết hạn
+      expiresAt: null,
       discountId: null,
-      status: "CONFIRMED", // Admin tạo là xác nhận luôn
+      status: "CONFIRMED",
       paymentStatus: paymentStatus,
-      NOTE: note || "Đơn hàng tạo bởi Admin",
+      NOTE: finalNote,
       pickupBranchId: car.BRANCH_ID,
       returnBranchId: car.BRANCH_ID,
     };
 
-    // 4. INSERT RENTAL_ORDER
+    // 6. INSERT ORDER
     const { orderId } = await rentalOrderModel.create(orderData, conn);
 
-    // 5. UPDATE CAR STATUS = 'RESERVED'
-    const oldStatus = car.STATUS; // Lấy từ 'car' đã fetch ở đầu
+    // 7. UPDATE CAR & LOG
+    const oldStatus = car.STATUS;
     const newStatus = "RESERVED";
     await carModel.updateCarStatus(carId, newStatus, conn);
-    // 6. GHI LOG
+
     await carModel.logStatusChange(
       carId,
-      oldStatus, // "AVAILABLE"
+      oldStatus,
       newStatus,
-      `Admin tạo đơn thủ công ${orderCode}`,
+      `Admin tạo đơn thủ công ${orderCode} (${typeToUse})`,
       conn
     );
-    // 7. Ghi nhận thanh toán (nếu có)
+
+    // 8. [FIX] TẠO PAYMENT RECORD (CHO CẢ CASH VÀ BANK_TRANSFER)
     if (
-      paymentMethod === "CASH" &&
+      (paymentMethod === "CASH" || paymentMethod === "BANK_TRANSFER") &&
       (paymentStatus === "PAID" || paymentStatus === "PARTIAL")
     ) {
-      await paymentModel.create(
-        {
-          orderId: orderId,
-          amount: amountPaid || 0,
-          paymentType: paymentStatus === "PAID" ? "FINAL_PAYMENT" : "DEPOSIT",
-          method: "CASH",
-          status: "SUCCESS",
-          transactionCode: `CASH_MANUAL_${orderId}_${adminId}`,
-        },
-        conn
-      );
+      if (paidAmount > 0) {
+        // [FIX] Nếu là Chuyển khoản -> Lưu method là "PayOS" để đối soát
+        const dbMethod = paymentMethod === "BANK_TRANSFER" ? "PayOS" : "CASH";
+
+        // Tạo mã giao dịch để phân biệt nguồn
+        const transPrefix =
+          paymentMethod === "BANK_TRANSFER" ? "MANUAL_BANK" : "MANUAL_CASH";
+
+        await paymentModel.create(
+          {
+            orderId: orderId,
+            amount: paidAmount,
+            paymentType: paymentStatus === "PAID" ? "FINAL_PAYMENT" : "DEPOSIT",
+            method: dbMethod, // "PayOS" hoặc "CASH"
+            status: "SUCCESS", // Admin đã xác nhận nhận tiền
+            transactionCode: `${transPrefix}_${orderId}_${adminId}`,
+          },
+          conn
+        );
+      }
     }
 
-    // 8. Gửi thông báo cho user
+    // 9. Gửi thông báo
     await notificationModel.create(
       {
         USER_ID: userId,
         TITLE: `Đơn hàng mới ${orderCode} đã được tạo`,
-        CONTENT: `Quản trị viên đã tạo một đơn thuê xe mới cho bạn.`,
+        CONTENT: `Quản trị viên đã tạo đơn thuê xe (${
+          typeToUse === "hour" ? "Theo Giờ" : "Theo Ngày"
+        }) cho bạn.`,
       },
       conn
     );
 
     await conn.commit();
-    return { orderId, orderCode, message: "Tạo đơn hàng thủ công thành công." };
+    return { orderId, orderCode, message: "Tạo đơn hàng thành công." };
   } catch (error) {
     if (conn) await conn.rollback();
-    console.error("Lỗi khi tạo đơn thủ công (Service):", error);
+    console.error("Lỗi service (Admin Create Order):", error);
     throw new Error(error.message || "Lỗi hệ thống.");
   } finally {
     if (conn) conn.release();
   }
 };
 
-/**
- * [MỚI] (Admin) Cập nhật/sửa đơn hàng
- * (Phiên bản này giả định Admin có thể sửa ngày và xe)
- */
 const adminUpdateOrder = async (orderId, updateData) => {
   let conn;
   try {

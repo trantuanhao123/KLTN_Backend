@@ -277,12 +277,18 @@ const handleAdminGetUserOrders = async (req, res) => {
  */
 const handleAdminCreateManualOrder = async (req, res) => {
   try {
-    const adminId = req.USER_ID; // Lấy từ authMiddleware (admin)
+    const adminId = req.USER_ID;
     const orderDetails = req.body;
 
-    // (Thêm validate chi tiết cho orderDetails ở đây)
+    // Validate cơ bản
     if (!orderDetails.userId || !orderDetails.carId) {
       return res.status(400).json({ error: "Thiếu thông tin User hoặc Xe." });
+    }
+
+    if (!orderDetails.startDate || !orderDetails.endDate) {
+      return res
+        .status(400)
+        .json({ error: "Thiếu thông tin ngày bắt đầu hoặc kết thúc." });
     }
 
     const result = await rentalOrderService.adminCreateManualOrder(
@@ -291,7 +297,13 @@ const handleAdminCreateManualOrder = async (req, res) => {
     );
     return res.status(201).json(result);
   } catch (error) {
-    return res.status(500).json({ error: error.message });
+    // Trả về lỗi 400 nếu là lỗi logic (ví dụ: tiền không đủ), 500 nếu lỗi hệ thống
+    const statusCode =
+      error.message.includes("Không tìm thấy") ||
+      error.message.includes("Số tiền")
+        ? 400
+        : 500;
+    return res.status(statusCode).json({ error: error.message });
   }
 };
 
