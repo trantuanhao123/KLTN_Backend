@@ -26,14 +26,20 @@ const getMonthlyRevenue = async () => {
 const getWeeklyRentalCount = async () => {
   const sql = `
     SELECT
-      YEAR(START_DATE) AS year,
-      WEEK(START_DATE, 1) AS week,
-      COUNT(ORDER_ID) AS rentalCount
-    FROM RENTAL_ORDER
-    WHERE STATUS IN ('CONFIRMED', 'IN_PROGRESS', 'COMPLETED')
-    GROUP BY year, week
-    ORDER BY year DESC, week DESC
-    LIMIT 12; 
+      yw.yearWeek,
+      FLOOR(yw.yearWeek / 100) AS year,
+      MOD(yw.yearWeek, 100) AS week,
+      COUNT(yw.ORDER_ID) AS rentalCount
+    FROM (
+      SELECT
+        ORDER_ID,
+        YEARWEEK(CREATED_AT, 1) AS yearWeek
+      FROM RENTAL_ORDER
+      WHERE STATUS IN ('CONFIRMED', 'IN_PROGRESS', 'COMPLETED')
+        AND CREATED_AT >= DATE_SUB(CURDATE(), INTERVAL 12 WEEK)
+    ) yw
+    GROUP BY yw.yearWeek
+    ORDER BY yw.yearWeek DESC;
   `;
   const [rows] = await connection.execute(sql);
   return rows;
