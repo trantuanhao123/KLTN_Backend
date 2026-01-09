@@ -71,17 +71,18 @@ The project focuses on **backend system design**, **business logic processing**,
 
 The backend follows a **modular MVC-inspired architecture**, with clear separation of concerns:
 
+```text
 src/
-├── config/ # Database, mail, payment, upload configuration
-├── controllers/ # Handle HTTP requests & responses
-├── services/ # Business logic layer
-├── models/ # Data access layer (Raw SQL using mysql2)
-├── middlewares/ # Authentication, authorization, validation
-├── routes/ # API route definitions
-├── public/ # Static files (images, css)
-├── views/ # EJS views (basic server-rendered pages)
-└── server.js # Application entry point
-
+├── config/      # Database, mail, payment, and upload configurations
+├── controllers/ # Handles incoming HTTP requests and sends responses
+├── services/    # Contains core business logic (Service Layer)
+├── models/      # Data access layer (Raw SQL queries using mysql2)
+├── middlewares/ # Auth, RBAC, and request validation logic
+├── routes/      # API endpoint definitions and routing
+├── public/      # Static assets (images, CSS, client-side JS)
+├── views/       # EJS templates for server-rendered pages
+└── server.js    # Application entry point and server setup
+```
 ---
 
 ## 🛡️ Best Practices Applied
